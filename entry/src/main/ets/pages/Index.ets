@@ -23,7 +23,7 @@ struct Index {
         .width('40%')
         .height('5%')
       }
-      .width('100%')
+      .width('90%')
     }
     .height('100%')
   }
