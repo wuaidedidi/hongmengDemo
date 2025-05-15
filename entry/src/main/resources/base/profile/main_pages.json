@@ -5,6 +5,8 @@
     "pages/TodoDetail",
     "pages/LockPage",
     "pages/StatisticsPage",
-    "pages/ProfilePage"
+    "pages/ProfilePage",
+    "pages/FocusTimer",
+    "pages/TodoOperation"
   ]
 }

@@ -12,12 +12,15 @@ class TodoItem {
   focusDuration: number = 0
   targetDate: string = '2025-05-14'
   remainDays: number = 1
+  duration: number = 25 // 默认专注时长（分钟）
 
   constructor(id: number, title: string, type: string) {
     this.id = id
     this.title = title
     this.type = type
     this.isCompleted = false
+    // 根据类型设置默认专注时长
+    this.duration = type === '白兔钟' ? 25 : 15
     
     // 设置创建时间
     const now = new Date()
@@ -132,6 +135,11 @@ struct Index {
                     .fontSize(22)
                     .fontWeight(FontWeight.Bold)
                     .fontColor('#222222')
+                  
+                  Text(`${item.duration}分钟`)
+                    .fontSize(14)
+                    .fontColor('#666666')
+                    .margin({ top: 4 })
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
@@ -139,11 +147,55 @@ struct Index {
                 if (item.type === '白兔钟') {
                   Text('📊').fontSize(24).margin({ right: 8 })
                   Text('⚙️').fontSize(24).margin({ right: 8 })
-                  Text('➕').fontSize(24)
+                  Button() {
+                    Text('开始')
+                      .fontSize(16)
+                      .fontColor('#FFFFFF')
+                  }
+                  .backgroundColor('#8A2BE2')
+                  .borderRadius(16)
+                  .width(70)
+                  .height(36)
+                  .onClick(() => {
+                    try {
+                      const result = router.pushUrl({
+                        url: 'pages/FocusTimer',
+                        params: {
+                          title: item.title,
+                          time: item.duration * 60 // 使用待办项的实际时长
+                        }
+                      });
+                      console.info(`跳转结果: ${result}`);
+                    } catch (error) {
+                      console.error(`跳转FocusTimer页面出错: ${JSON.stringify(error)}`);
+                    }
+                  })
                 } else {
                   Text('⏱️').fontSize(24).margin({ right: 8 })
                   Text('✏️').fontSize(24).margin({ right: 8 })
-                  Text('✓').fontSize(24)
+                  Button() {
+                    Text('开始')
+                      .fontSize(16)
+                      .fontColor('#FFFFFF')
+                  }
+                  .backgroundColor('#8A2BE2')
+                  .borderRadius(16)
+                  .width(70)
+                  .height(36)
+                  .onClick(() => {
+                    try {
+                      const result = router.pushUrl({
+                        url: 'pages/FocusTimer',
+                        params: {
+                          title: item.title,
+                          time: item.duration * 60 // 使用待办项的实际时长
+                        }
+                      });
+                      console.info(`跳转结果: ${result}`);
+                    } catch (error) {
+                      console.error(`跳转FocusTimer页面出错: ${JSON.stringify(error)}`);
+                    }
+                  })
                 }
               }
               .height(60)
@@ -156,12 +208,17 @@ struct Index {
               .gesture(
                 LongPressGesture()
                   .onAction(() => {
-                    router.pushUrl({
-                      url: 'pages/TodoOperation',
-                      params: {
-                        todoId: item.id
-                      }
-                    });
+                    try {
+                      const result = router.pushUrl({
+                        url: 'pages/TodoOperation',
+                        params: {
+                          todoId: item.id
+                        }
+                      });
+                      console.info(`跳转到TodoOperation结果: ${result}`);
+                    } catch (error) {
+                      console.error(`跳转TodoOperation页面出错: ${JSON.stringify(error)}`);
+                    }
                   })
               )
             })
@@ -196,7 +253,11 @@ struct Index {
             Text('待办事项').fontSize(12).margin({ top: 4 })
           }.layoutWeight(1).justifyContent(FlexAlign.Center)
           .onClick(() => {
-            router.push({ url: 'pages/TodoDetail' });
+            try {
+              router.push({ url: 'pages/TodoDetail' });
+            } catch (error) {
+              console.error(`跳转TodoDetail页面出错: ${JSON.stringify(error)}`);
+            }
           })
           
           Column() {
@@ -204,7 +265,11 @@ struct Index {
             Text('锁机').fontSize(12).margin({ top: 4 })
           }.layoutWeight(1).justifyContent(FlexAlign.Center)
           .onClick(() => {
-            router.push({ url: 'pages/LockPage' });
+            try {
+              router.push({ url: 'pages/LockPage' });
+            } catch (error) {
+              console.error(`跳转LockPage页面出错: ${JSON.stringify(error)}`);
+            }
           })
           
           Column() {
@@ -212,7 +277,11 @@ struct Index {
             Text('统计数据').fontSize(12).margin({ top: 4 })
           }.layoutWeight(1).justifyContent(FlexAlign.Center)
           .onClick(() => {
-            router.push({ url: 'pages/StatisticsPage' });
+            try {
+              router.push({ url: 'pages/StatisticsPage' });
+            } catch (error) {
+              console.error(`跳转StatisticsPage页面出错: ${JSON.stringify(error)}`);
+            }
           })
           
           Column() {
@@ -220,7 +289,11 @@ struct Index {
             Text('我的').fontSize(12).margin({ top: 4 })
           }.layoutWeight(1).justifyContent(FlexAlign.Center)
           .onClick(() => {
-            router.push({ url: 'pages/ProfilePage' });
+            try {
+              router.push({ url: 'pages/ProfilePage' });
+            } catch (error) {
+              console.error(`跳转ProfilePage页面出错: ${JSON.stringify(error)}`);
+            }
           })
         }
         .height(56)
