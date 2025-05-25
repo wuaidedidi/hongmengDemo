@@ -167,18 +167,22 @@ struct FocusTimer {
   }
 
   aboutToDisappear() {
+    // 清除计时器
     if (this.timerId !== -1) {
       clearInterval(this.timerId);
       this.timerId = -1;
     }
+    
+    // 停止音乐播放
     audioPlayer.stop();
   }
-
+  
   startTimer() {
+    // 确保只有一个计时器在运行
     if (this.timerId !== -1) {
       clearInterval(this.timerId);
     }
-    this.isPaused = false;
+    
     this.timerId = setInterval(() => {
       if (!this.isPaused) {
         if (this.totalSeconds > 0) {
@@ -186,228 +190,302 @@ struct FocusTimer {
           this.minutes = Math.floor(this.totalSeconds / 60);
           this.seconds = this.totalSeconds % 60;
         } else {
+          // 计时结束
           clearInterval(this.timerId);
           this.timerId = -1;
+          // 计时结束时停止音乐
           audioPlayer.stop();
-          this.handleTimerCompletion();
+          promptAction.showToast({
+            message: '专注时间结束！',
+            duration: 3000
+          });
         }
       }
     }, 1000);
   }
-
-  handleTimerCompletion() {
-    promptAction.showToast({ message: '专注时间圆满结束！' });
-    let paramsToSend: RouterParamsObject = {};
-
-    if (this.isSequence) {
-      paramsToSend['sequenceAction'] = 'taskCompleted';
-      if (this.collectionId !== null) {
-        paramsToSend['collectionId'] = this.collectionId;
-      }
-      if (this.subTaskId !== null) {
-        paramsToSend['subTaskId'] = this.subTaskId;
-      }
-      if (this.currentSubTaskIndex !== -1) {
-        paramsToSend['currentSubTaskIndex'] = this.currentSubTaskIndex;
-      }
-
-      router.replaceUrl({ url: 'pages/TodoDetail', params: paramsToSend })
-        .catch((err: Error) => console.error("Failed to navigate for sequence completion: " + JSON.stringify(err)));
-    } else {
-      paramsToSend['action'] = 'focusCompleted';
-      if (this.todoId !== null) {
-        paramsToSend['todoId'] = typeof this.todoId === 'number' ? this.todoId.toString() : this.todoId;
-        router.replaceUrl({ url: 'pages/Index', params: paramsToSend })
-          .catch((err: Error) => console.error("Failed to navigate to Index for completion: " + JSON.stringify(err)));
-      } else if (this.collectionId !== null && this.subTaskId !== null) {
-        if (this.collectionId !== null) {
-          paramsToSend['collectionId'] = this.collectionId;
-        }
-        if (this.subTaskId !== null) {
-          paramsToSend['subTaskId'] = this.subTaskId;
-        }
-        router.replaceUrl({ url: 'pages/TodoDetail', params: paramsToSend })
-          .catch((err: Error) => console.error("Failed to navigate to TodoDetail for completion: " +
-          JSON.stringify(err)));
-      } else {
-        router.back();
-      }
-    }
-  }
-
-  togglePause() {
-    this.isPaused = !this.isPaused;
-    if (this.isPaused) {
-      promptAction.showToast({ message: "计时已暂停" });
-    } else {
-      promptAction.showToast({ message: "计时已恢复" });
-    }
-  }
-
-  handleExitFocus() {
-    if (this.timerId !== -1) {
-      clearInterval(this.timerId);
-      this.timerId = -1;
-    }
-    audioPlayer.stop();
-    promptAction.showToast({ message: "专注已退出" });
-    let paramsToSend: RouterParamsObject = {};
-
-    if (this.isSequence) {
-      paramsToSend['sequenceAction'] = 'sequenceAborted';
-      if (this.collectionId !== null) {
-        paramsToSend['collectionId'] = this.collectionId;
-      }
-      if (this.subTaskId !== null) {
-        paramsToSend['subTaskId'] = this.subTaskId;
-      }
-
-      router.replaceUrl({ url: 'pages/TodoDetail', params: paramsToSend })
-        .catch((err: Error) => console.error("Failed to navigate for sequence abort: " + JSON.stringify(err)));
-    } else {
-      router.back();
-    }
-  }
-
-  playSelectedMusic(music: string, showToast: boolean = true) {
+  
+  // 播放选择的音乐
+  playSelectedMusic(music: string) {
     this.selectedMusic = music;
+    
     try {
-      if (music === '无声') {
-        audioPlayer.stop();
-      } else {
-        audioPlayer.play(music);
-      }
-      if (showToast) {
-        promptAction.showToast({
-          message: music === '无声' ? '已切换到静音模式' : `正在播放: ${music}`,
-          duration: 2000
-        });
-      }
-    } catch (error) { // Consider more specific error type if possible for audioPlayer
-      console.error(`播放音乐 '${music}' 失败: ${JSON.stringify(error)}`);
-      if (showToast) {
-        promptAction.showToast({ message: '播放音乐失败' });
-      }
+      // 播放选中的音乐
+      audioPlayer.play(music);
+      
+      promptAction.showToast({
+        message: music === '无声' ? '已切换到静音模式' : `正在播放: ${music}`,
+        duration: 2000
+      });
+    } catch (error) {
+      console.error(`播放音乐失败: ${error}`);
+      promptAction.showToast({
+        message: '播放音乐失败，请重试',
+        duration: 2000
+      });
     }
   }
-
+  
   build() {
     Stack() {
-      Column().width('100%').height('100%')
+      // 背景渐变
+      Column()
+        .width('100%')
+        .height('100%')
         .linearGradient({
           angle: 180,
           colors: [['#333355', 0.0], ['#503060', 0.3], ['#803070', 0.7], ['#8A2BE2', 1.0]]
         })
-
+      
+      // 主内容
       Column() {
+        // 顶部区域
         Row() {
-          Text(this.isSequence ? `序列 (${this.currentSubTaskIndex + 1}/${this.totalSubTasksInCollection})` :
-            '专注模式')
-            .fontSize(18).fontColor('#FFFFFF').margin({ left: 16 }).opacity(0.8)
-          Blank()
-          // Removed extra icons for now
-        }.width('100%').height(50).padding({ top: 10 })
-
-        Column() {
-          Text(this.quote)
+          Text('17:06')
             .fontSize(20)
             .fontColor('#FFFFFF')
-            .fontWeight(FontWeight.Medium)
-            .margin({ top: 20 })
-            .textAlign(TextAlign.Center)
-            .padding({ left: 20, right: 20 }) // Changed paddingSymmetric
-        }.width('100%').margin({ bottom: 30 })
-
-        Column() {
-          Text(this.displayTaskTitle)
-            .fontSize(24)
+            .margin({ left: 16 })
+          
+          Blank()
+          
+          Row({ space: 4 }) {
+            Text('📷')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
+            Text('⧉')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
+            Text('↗')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
+            Text('⬇')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
+          }
+          .margin({ right: 16 })
+        }
+        .width('100%')
+        .height(60)
+        
+        // 引用区域
+        Row() {
+          Text('"')
+            .fontSize(60)
             .fontColor('#FFFFFF')
-            .fontWeight(FontWeight.Bold)
-            .margin({ bottom: 20 })
-            .padding({ left: 15, right: 15 })// Changed paddingSymmetric
-            .textAlign(TextAlign.Center)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .maxLines(2)
-
+            .opacity(0.5)
+            .margin({ top: -30 })
+          
+          Column() {
+            Text(this.quote)
+              .fontSize(22)
+              .fontColor('#FFFFFF')
+              .fontWeight(FontWeight.Medium)
+              .margin({ top: 30 })
+          }
+          .layoutWeight(1)
+        }
+        .width('100%')
+        .margin({ top: 16, bottom: 32 })
+        .padding({ left: 16, right: 16 })
+        
+        // 倒计时区域
+        Column() {
           Stack() {
             Circle()
-              .width(280)
-              .height(280)
+              .width(300)
+              .height(300)
               .fill('transparent')
               .stroke('#FFFFFF')
-              .strokeWidth(6)
-              .opacity(0.4)
-            Progress({
-              value: this.totalSeconds,
-              total: this.initialTotalSeconds, // Use initialTotalSeconds for progress total
-              type: ProgressType.Ring
-            })
-              .width(280).height(280).color(Color.White).style({ strokeWidth: 8 })
+              .strokeWidth(8)
+              .opacity(0.5)
+            
             Text(`${this.minutes.toString().padStart(2, '0')}:${this.seconds.toString().padStart(2, '0')}`)
-              .fontSize(70).fontColor('#FFFFFF').fontWeight(FontWeight.Medium)
+              .fontSize(80)
+              .fontColor('#FFFFFF')
+              .fontWeight(FontWeight.Medium)
           }
-          .margin({ top: 20, bottom: 40 })
-
-          Text(`${this.isPaused ? '已暂停' :
-            (this.timerId === -1 && this.totalSeconds <= 0 ? '已完成' : '进行中')} · ${this.selectedMusic}`)
-            .fontSize(16).fontColor('#FFFFFF').opacity(0.7).margin({ top: 8 })
+          .margin({ top: 40, bottom: 40 })
+          
+          // 提示文本
+          Text('点击开始按钮来专注计时')
+            .fontSize(18)
+            .fontColor('#FFFFFF')
+            .opacity(0.8)
+          
+          Text(`${this.isPaused ? '已暂停' : '进行中'} · ${this.selectedMusic}`)
+            .fontSize(16)
+            .fontColor('#FFFFFF')
+            .opacity(0.6)
+            .margin({ top: 8 })
         }
-        .layoutWeight(1).width('100%').justifyContent(FlexAlign.Center)
-
-        Row({ space: 20 }) {
+        .layoutWeight(1)
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+        
+        // 底部控制栏
+        Row() {
           Button({ type: ButtonType.Circle, stateEffect: true }) {
-            Text('🎵').fontSize(24)
-          }.width(60).height(60).backgroundColor('rgba(255,255,255,0.2)')
+            Text('🌙')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
+          }
+          .width(50)
+          .height(50)
+          .backgroundColor('rgba(255, 255, 255, 0.2)')
+          
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            Text('🎵')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
+          }
+          .width(50)
+          .height(50)
+          .backgroundColor('rgba(255, 255, 255, 0.2)')
           .onClick(() => {
             this.isMusicDialogShow = true;
-            this.musicDialogController.open();
           })
-
+          
           Button({ type: ButtonType.Circle, stateEffect: true }) {
-            Text(this.isPaused ? '▶' : '❚❚').fontSize(28).fontColor("#800080")/* Purple */.fontWeight(FontWeight.Bold)
+            Text(this.isPaused ? '▶' : '⏸')
+              .fontSize(30)
+              .fontColor('#FFFFFF')
           }
-          .width(80)
-          .height(80)
-          .backgroundColor(Color.White)
+          .width(70)
+          .height(70)
+          .backgroundColor('rgba(255, 255, 255, 0.3)')
+          .margin({ left: 16, right: 16 })
           .onClick(() => {
-            this.togglePause();
-          })
-          .enabled(this.totalSeconds > 0 || this.timerId !== -1)
-
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            Text('✓').fontSize(24)
-          }
-          .width(60)
-          .height(60)
-          .backgroundColor('rgba(255,255,255,0.2)')
-          .onClick(() => {
-            if (this.timerId !== -1) {
-              clearInterval(this.timerId);
-              this.timerId = -1;
-              this.totalSeconds = 0;
-              this.minutes = 0;
-              this.seconds = 0;
-              audioPlayer.stop();
-              promptAction.showToast({ message: "提前完成专注！" });
-              this.handleTimerCompletion();
+            this.isPaused = !this.isPaused;
+            
+            // 处理音乐的暂停和恢复
+            if (this.isPaused) {
+              audioPlayer.pause();
+            } else {
+              // 只有在非"无声"模式下恢复播放
+              if (this.selectedMusic !== '无声') {
+                audioPlayer.resume();
+              }
             }
           })
-          .visibility(this.totalSeconds > 0 || this.timerId !== -1 ? Visibility.Visible : Visibility.Hidden)
-
+          
           Button({ type: ButtonType.Circle, stateEffect: true }) {
-            Text('✕').fontSize(24)
+            Text('↻')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
           }
-          .width(60)
-          .height(60)
-          .backgroundColor('rgba(255,255,255,0.2)')
+          .width(50)
+          .height(50)
+          .backgroundColor('rgba(255, 255, 255, 0.2)')
           .onClick(() => {
-            this.handleExitFocus();
+            // 重置计时器
+            this.isPaused = true;
+            this.totalSeconds = 25 * 60; // 重置为25分钟
+            this.minutes = 25;
+            this.seconds = 0;
+            
+            // 停止音乐
+            audioPlayer.pause();
           })
-          .visibility(this.totalSeconds > 0 || this.timerId !== -1 ? Visibility.Visible : Visibility.Hidden)
+          
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            Text('■')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
+          }
+          .width(50)
+          .height(50)
+          .backgroundColor('rgba(255, 255, 255, 0.2)')
+          .onClick(() => {
+            // 停止音乐
+            audioPlayer.stop();
+            router.back();
+          })
         }
-        .width('100%').padding(20).justifyContent(FlexAlign.Center).margin({ bottom: 30 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+        .margin({ bottom: 30 })
+        
+        Text('↓')
+          .fontSize(24)
+          .fontColor('#FFFFFF')
+          .margin({ bottom: 24 })
+          .onClick(() => {
+            // 停止音乐
+            audioPlayer.stop();
+            router.back();
+          })
       }
-      .width('100%').height('100%').padding({ top: 10 })
+      .width('100%')
+      .height('100%')
+      
+      // 音乐选择对话框
+      if (this.isMusicDialogShow) {
+        Column() {
+          Column() {
+            // 标题
+            Text('选择背景音乐')
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .margin({ top: 20, bottom: 16 })
+            
+            // 音乐选项列表
+            List() {
+              ForEach(this.musicOptions, (music: string) => {
+                ListItem() {
+                  Row() {
+                    Text(music)
+                      .fontSize(18)
+                      .fontColor(this.selectedMusic === music ? '#8A2BE2' : '#333333')
+                      .fontWeight(this.selectedMusic === music ? FontWeight.Bold : FontWeight.Normal)
+                    
+                    Blank()
+                    
+                    if (this.selectedMusic === music) {
+                      Text('✓')
+                        .fontSize(18)
+                        .fontColor('#8A2BE2')
+                    }
+                  }
+                  .width('100%')
+                  .padding({ left: 20, right: 20, top: 12, bottom: 12 })
+                  .onClick(() => {
+                    this.playSelectedMusic(music);
+                    this.isMusicDialogShow = false;
+                  })
+                }
+              })
+            }
+            .width('100%')
+            .margin({ bottom: 20 })
+            
+            // 取消按钮
+            Button('取消')
+              .width('80%')
+              .height(45)
+              .fontSize(16)
+              .fontColor('#FFFFFF')
+              .backgroundColor('#8A2BE2')
+              .borderRadius(22)
+              .margin({ bottom: 20 })
+              .onClick(() => {
+                this.isMusicDialogShow = false;
+              })
+          }
+          .width('85%')
+          .borderRadius(16)
+          .backgroundColor('#FFFFFF')
+          .alignItems(HorizontalAlign.Center)
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor('rgba(0, 0, 0, 0.5)')
+        .justifyContent(FlexAlign.Center)
+        .onClick(() => {
+          // 点击背景关闭对话框
+          this.isMusicDialogShow = false;
+        })
+      }
     }
+    .width('100%')
+    .height('100%')
   }
 } 
