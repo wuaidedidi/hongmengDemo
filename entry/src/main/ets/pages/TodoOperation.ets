@@ -1,378 +1,229 @@
 import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
 
-interface RouterParams {
-  action: string;
-  todoId: number;
+interface TodoOperationResult {
+  id: string | number;
+  title: string;
+  duration: number;
+}
+
+@CustomDialog
+struct DeleteConfirmDialog {
+  controller: CustomDialogController;
+  onConfirm: () => void = () => {};
+
+  build() {
+    Column() {
+      Text('删除待办')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .margin({ top: 10, bottom: 10 })
+      
+      Text('确定要删除这个待办吗？')
+        .fontSize(16)
+        .margin({ top: 10, bottom: 20 })
+      
+      Row() {
+        Button('取消')
+          .onClick(() => {
+            this.controller.close();
+          })
+          .margin({ right: 10 })
+        
+        Button('删除')
+          .fontColor('#FF3B30')
+          .onClick(() => {
+            this.onConfirm();
+            this.controller.close();
+          })
+      }
+      .margin({ top: 10, bottom: 10 })
+    }
+    .width('80%')
+    .padding(20)
+  }
 }
 
 @Entry
 @Component
-export default struct TodoOperation {
-  @State todoId: number = -1;
-  
-  aboutToAppear() {
-    const params = router.getParams();
-    if (params) {
-      const paramsObj = params as Record<string, string | number>;
-      if (paramsObj.todoId !== undefined) {
-        this.todoId = paramsObj.todoId as number;
+struct TodoOperation {
+  @State todoId: string | number = '';
+  @State todoTitle: string = '';
+  @State todoDuration: number = 25;
+  @State isEditMode: boolean = false;
+  @State showDeleteConfirm: boolean = false;
+  private deleteDialogController: CustomDialogController = new CustomDialogController({
+    builder: DeleteConfirmDialog({
+      onConfirm: () => {
+        this.deleteTodo();
       }
+    })
+  });
+
+  aboutToAppear() {
+    const params = router.getParams() as Record<string, string | number>;
+    if (params) {
+      this.todoId = params.todoId || '';
+      this.todoTitle = params.todoTitle as string || '';
+      this.isEditMode = true;
     }
   }
-  
+
+  // 保存待办
+  saveTodo() {
+    if (this.todoTitle.trim() === '') {
+      promptAction.showToast({ message: '请输入待办标题' });
+      return;
+    }
+
+    const result: TodoOperationResult = {
+      id: this.todoId,
+      title: this.todoTitle,
+      duration: this.todoDuration
+    };
+
+    router.back({
+      url: 'pages/Index',
+      params: {
+        action: this.isEditMode ? 'edit' : 'add',
+        id: result.id,
+        title: result.title,
+        duration: result.duration
+      }
+    });
+  }
+
+  // 删除待办
+  deleteTodo() {
+    router.back({
+      url: 'pages/Index',
+      params: {
+        action: 'delete',
+        todoId: this.todoId
+      }
+    });
+  }
+
   build() {
-    Stack() {
-      Column() {
-        // 顶部显示待办号码
-        Row() {
-          Text('22')
-            .fontSize(30)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#000000')
-            .margin({ left: 16 })
-          
-          Blank()
-          
-          Row({ space: 16 }) {
-            Column() {
-              Text('⏰')
-                .fontSize(26)
-                .fontColor('#03A9F4')
-              Text('定时提醒/专注')
-                .fontSize(12)
-                .fontColor('#333333')
-                .margin({ top: 4 })
-            }
-            .alignItems(HorizontalAlign.Center)
-            
-            Column() {
-              Text('🖼️')
-                .fontSize(26)
-                .fontColor('#03A9F4')
-              Text('更换背景')
-                .fontSize(12)
-                .fontColor('#333333')
-                .margin({ top: 4 })
-            }
-            .alignItems(HorizontalAlign.Center)
-            
-            Column() {
-              Text('📋')
-                .fontSize(26)
-                .fontColor('#03A9F4')
-              Text('独立白名单')
-                .fontSize(12)
-                .fontColor('#333333')
-                .margin({ top: 4 })
-            }
-            .alignItems(HorizontalAlign.Center)
+    Column() {
+      // 顶部标题栏
+      Row() {
+        Image('/common/images/back.png')
+          .width(24)
+          .height(24)
+          .margin({ left: 16 })
+          .onClick(() => {
+            router.back();
+          })
+
+        Text(this.isEditMode ? '编辑待办' : '新建待办')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#333333')
+          .margin({ left: 16 })
+
+        Blank()
+
+        if (this.isEditMode) {
+          Text('删除')
+            .fontSize(16)
+            .fontColor('#FF3B30')
             .margin({ right: 16 })
-          }
-        }
-        .width('100%')
-        .height(100)
-        .backgroundColor('#FFFFFF')
-        .padding({ top: 20 })
-        
-        // 操作按钮行
-        Row() {
-          Button('编辑')
-            .fontSize(16)
-            .fontColor('#03A9F4')
-            .backgroundColor('#E1F5FE')
-            .borderRadius(20)
-            .height(40)
-            .width('33.3%')
-            .margin(5)
-          
-          Button('排序 | 移动')
-            .fontSize(16)
-            .fontColor('#03A9F4')
-            .backgroundColor('#E1F5FE')
-            .borderRadius(20)
-            .height(40)
-            .width('33.3%')
-            .margin(5)
-          
-          Button('删除')
-            .fontSize(16)
-            .fontColor('#FF5252')
-            .backgroundColor('#FFEBEE')
-            .borderRadius(20)
-            .height(40)
-            .width('33.3%')
-            .margin(5)
             .onClick(() => {
-              // 删除后返回首页，并传递删除信息
-              try {
-                router.pushUrl({
-                  url: 'pages/Index',
-                  params: {
-                    action: 'delete',
-                    todoId: this.todoId
-                  }
-                });
-              } catch (error) {
-                console.error(`返回首页出错: ${JSON.stringify(error)}`);
-                router.back(); // 如果跳转失败则简单返回
-              }
+              this.deleteDialogController.open();
+            })
+        }
+      }
+      .width('100%')
+      .height(56)
+      .backgroundColor('#FFFFFF')
+
+      // 表单内容
+      Column() {
+        // 标题输入
+        Column() {
+          Text('标题')
+            .fontSize(16)
+            .fontColor('#666666')
+            .margin({ bottom: 8 })
+
+          TextInput({ placeholder: '请输入待办标题', text: this.todoTitle })
+            .width('100%')
+            .height(48)
+            .backgroundColor('#F5F5F5')
+            .borderRadius(8)
+            .padding({ left: 16, right: 16 })
+            .onChange((value: string) => {
+              this.todoTitle = value;
             })
         }
         .width('100%')
-        .padding({ left: 10, right: 10, top: 10, bottom: 10 })
-        
-        // 功能区域
-        Row() {
-          Column() {
-            Text('📊')
-              .fontSize(32)
-              .fontColor('#03A9F4')
-            Text('专注历史记录')
-              .fontSize(14)
-              .fontColor('#03A9F4')
-              .margin({ top: 8 })
-          }
-          .width('50%')
-          .backgroundColor('#E1F5FE')
-          .borderRadius(8)
-          .padding(20)
-          .margin(5)
-          
-          Column() {
-            Text('📈')
-              .fontSize(32)
-              .fontColor('#03A9F4')
-            Text('数据统计')
-              .fontSize(14)
-              .fontColor('#03A9F4')
-              .margin({ top: 8 })
-          }
-          .width('50%')
-          .backgroundColor('#E1F5FE')
-          .borderRadius(8)
-          .padding(20)
-          .margin(5)
-        }
-        .width('100%')
-        .padding({ left: 10, right: 10 })
-        
-        // 统计信息区域
+        .padding(16)
+
+        // 时长设置
         Column() {
-          Text('累计专注')
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#333333')
-            .width('100%')
-            .textAlign(TextAlign.Center)
-            .margin({ top: 16, bottom: 16 })
-          
-          Row() {
-            Text('0')
-              .fontSize(40)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#03A9F4')
-            Text('次')
-              .fontSize(16)
-              .fontColor('#666666')
-              .margin({ left: 4, bottom: 8 })
-              .alignSelf(ItemAlign.End)
-          }
-          .justifyContent(FlexAlign.Center)
-          .width('50%')
-          
-          Row() {
-            Text('0')
-              .fontSize(40)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#03A9F4')
-            Text('分钟')
-              .fontSize(16)
-              .fontColor('#666666')
-              .margin({ left: 4, bottom: 8 })
-              .alignSelf(ItemAlign.End)
-          }
-          .justifyContent(FlexAlign.Center)
-          .width('50%')
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Center)
-        
-        // 定时提醒信息
-        Column() {
-          Text('定时提醒 | 定时学霸模式')
+          Text('时长（分钟）')
             .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#03A9F4')
-            .width('100%')
-            .textAlign(TextAlign.Center)
-            .margin({ top: 16, bottom: 8 })
-          
-          Text('没有设置定时提醒或定时学霸')
-            .fontSize(14)
             .fontColor('#666666')
-            .width('100%')
-            .textAlign(TextAlign.Center)
-            .margin({ bottom: 16 })
-          
-          Text('目标截止日期 2025-05-14 剩余 1天')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#03A9F4')
-            .width('100%')
-            .textAlign(TextAlign.Center)
-            .margin({ bottom: 16 })
-          
+            .margin({ bottom: 8 })
+
           Row() {
-            Column() {
-              Text('计划内已完成')
-                .fontSize(12)
-                .fontColor('#666666')
-                .margin({ bottom: 4 })
-              
-              Row() {
-                Text('0')
-                  .fontSize(24)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#333333')
-                Text('分钟')
-                  .fontSize(12)
-                  .fontColor('#666666')
-                  .alignSelf(ItemAlign.End)
-                  .margin({ left: 4, bottom: 4 })
-              }
-            }
-            .width('33.3%')
-            .alignItems(HorizontalAlign.Center)
-            
-            Column() {
-              Text('长期计划完成度')
-                .fontSize(12)
-                .fontColor('#666666')
-                .margin({ bottom: 4 })
-              
-              Row() {
-                // 圆形进度条（简化表示）
-                Stack() {
-                  Circle()
-                    .width(50)
-                    .height(50)
-                    .fill('#EEEEEE')
-                    .strokeWidth(5)
-                    .stroke('#03A9F4')
-                  
-                  Text('0')
-                    .fontSize(16)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#333333')
+            Button('-')
+              .width(48)
+              .height(48)
+              .fontSize(20)
+              .fontColor('#333333')
+              .backgroundColor('#F5F5F5')
+              .borderRadius(8)
+              .onClick(() => {
+                if (this.todoDuration > 5) {
+                  this.todoDuration -= 5;
                 }
-              }
-            }
-            .width('33.3%')
-            .alignItems(HorizontalAlign.Center)
-            
-            Column() {
-              Text('计划总数')
-                .fontSize(12)
-                .fontColor('#666666')
-                .margin({ bottom: 4 })
-              
-              Row() {
-                Text('1980')
-                  .fontSize(24)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#333333')
-                Text('分钟')
-                  .fontSize(12)
-                  .fontColor('#666666')
-                  .alignSelf(ItemAlign.End)
-                  .margin({ left: 4, bottom: 4 })
-              }
-            }
-            .width('33.3%')
-            .alignItems(HorizontalAlign.Center)
-          }
-          .width('100%')
-          .padding({ left: 10, right: 10 })
-          
-          // 底部信息行
-          Row() {
-            Text('📅')
+              })
+
+            Text(this.todoDuration.toString())
               .fontSize(20)
-              .fontColor('#666666')
-            Text('总共坚持天数')
-              .fontSize(14)
-              .fontColor('#666666')
-              .margin({ left: 8 })
-            
-            Blank()
-            
-            Text('0 天')
-              .fontSize(14)
-              .fontWeight(FontWeight.Bold)
+              .fontWeight(FontWeight.Medium)
               .fontColor('#333333')
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-          
-          Row() {
-            Text('🔄')
+              .margin({ left: 16, right: 16 })
+
+            Button('+')
+              .width(48)
+              .height(48)
               .fontSize(20)
-              .fontColor('#666666')
-            Text('连续坚持天数')
-              .fontSize(14)
-              .fontColor('#666666')
-              .margin({ left: 8 })
-            
-            Blank()
-            
-            Text('0 天')
-              .fontSize(14)
-              .fontWeight(FontWeight.Bold)
               .fontColor('#333333')
+              .backgroundColor('#F5F5F5')
+              .borderRadius(8)
+              .onClick(() => {
+                this.todoDuration += 5;
+              })
           }
           .width('100%')
-          .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-          
-          Row() {
-            Text('📝')
-              .fontSize(20)
-              .fontColor('#666666')
-            Text('创建日期')
-              .fontSize(14)
-              .fontColor('#666666')
-              .margin({ left: 8 })
-            
-            Blank()
-            
-            Text('2025年05月13日')
-              .fontSize(14)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#333333')
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 12, bottom: 24 })
+          .justifyContent(FlexAlign.Center)
         }
         .width('100%')
-        .backgroundColor('#F5F5F5')
-        .margin({ top: 16 })
+        .padding(16)
+
+        // 保存按钮
+        Button('保存')
+          .width('90%')
+          .height(48)
+          .fontSize(16)
+          .fontColor('#FFFFFF')
+          .backgroundColor('#8A2BE2')
+          .borderRadius(24)
+          .margin({ top: 32 })
+          .onClick(() => {
+            this.saveTodo();
+          })
       }
       .width('100%')
+      .layoutWeight(1)
       .backgroundColor('#FFFFFF')
-      
-      // 关闭按钮
-      Button('×')
-        .width(40)
-        .height(40)
-        .fontSize(24)
-        .fontColor('#FFFFFF')
-        .backgroundColor('#8A2BE2')
-        .borderRadius(20)
-        .position({ x: '85%', y: 20 })
-        .onClick(() => {
-          router.back();
-        })
+      .margin({ top: 8 })
     }
     .width('100%')
     .height('100%')
+    .backgroundColor('#F8F8F8')
   }
 } 

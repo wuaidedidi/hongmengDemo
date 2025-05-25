@@ -2,7 +2,7 @@ import router from '@ohos.router';
 
 @Entry
 @Component
-export default struct Second {
+struct Second {
   build() {
     Column() {
       // 顶部蓝色栏
@@ -87,21 +87,21 @@ export default struct Second {
           Text('锁机').fontSize(12).margin({ top: 4 })
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
         .onClick(() => {
-          router.push({ url: 'pages/LockPage' });
+          router.pushUrl({ url: 'pages/LockPage' });
         })
         Column() {
           Text('📊').fontSize(24)
           Text('统计数据').fontSize(12).margin({ top: 4 })
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
         .onClick(() => {
-          router.push({ url: 'pages/StatisticsPage' });
+          router.pushUrl({ url: 'pages/StatisticsPage' });
         })
         Column() {
           Text('👤').fontSize(24)
           Text('我的').fontSize(12).margin({ top: 4 })
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
         .onClick(() => {
-          router.push({ url: 'pages/ProfilePage' });
+          router.pushUrl({ url: 'pages/ProfilePage' });
         })
       }
       .height(56)
