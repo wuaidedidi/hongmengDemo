@@ -1,217 +1,227 @@
 import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
+import { TabBar } from '../components/TabBar';
 
 @Entry
 @Component
-export default struct LockPage {
+struct LockPage {
+  @State selectedDuration: number = 30; // 默认30分钟
+  @State isLocked: boolean = false;
+  @State remainingTime: number = 0;
+  @State timer: number = -1;
+  @State showDurationPicker: boolean = false;
+  @State showUnlockConfirm: boolean = false;
+
+  aboutToAppear() {
+    // 初始化页面
+  }
+
+  aboutToDisappear() {
+    // 清理定时器
+    if (this.timer !== -1) {
+      clearInterval(this.timer);
+      this.timer = -1;
+    }
+  }
+
+  startLock() {
+    this.isLocked = true;
+    this.remainingTime = this.selectedDuration * 60;
+    
+    // 启动定时器
+    this.timer = setInterval(() => {
+      if (this.remainingTime > 0) {
+        this.remainingTime--;
+      } else {
+        this.unlock();
+      }
+    }, 1000);
+  }
+
+  unlock() {
+    if (this.timer !== -1) {
+      clearInterval(this.timer);
+      this.timer = -1;
+    }
+    this.isLocked = false;
+    this.remainingTime = 0;
+  }
+
+  formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+  }
+
   build() {
     Stack() {
-      // 背景
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor('#F8F8F8')
-      
       Column() {
-        // 顶部栏
+        // 顶部标题栏
         Row() {
+          Image('/common/images/back.png')
+            .width(24)
+            .height(24)
+            .margin({ left: 16 })
+            .onClick(() => {
+              if (this.isLocked) {
+                promptAction.showToast({ 
+                  message: '请先解除锁机状态',
+                  duration: 2000
+                });
+                return;
+              }
+              router.back();
+            })
+
           Text('锁机')
-            .fontSize(22)
+            .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#222222')
-          
+            .fontColor('#333333')
+            .margin({ left: 16 })
+
           Blank()
-          
-          Row({ space: 20 }) {
-            Column() {
-              Text('必开')
-                .fontSize(16)
-                .fontColor('#333333')
-            }
-            .backgroundColor('#F0F0F0')
-            .borderRadius(16)
-            .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-            
-            Column() {
-              Text('权限')
-                .fontSize(16)
-                .fontColor('#333333')
-            }
-            .backgroundColor('#F0F0F0')
-            .borderRadius(16)
-            .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-            
-            Text('≡').fontSize(24)
-          }
+
+          Text('🔒')
+            .fontSize(24)
+            .fontColor('#333333')
+            .margin({ right: 16 })
         }
         .width('100%')
-        .height(60)
-        .padding({ left: 16, right: 16 })
-        
-        // 主体内容
-        Column({ space: 16 }) {
-          // 小憩卡片
-          Row() {
-            Row() {
-              Text('🍃').fontSize(28)
-              
-              Column() {
-                Text('小憩')
-                  .fontSize(20)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#FFFFFF')
-                  .margin({ left: 16 })
-                
-                Text('放松身心的深呼吸，感受禅修般的宁静')
-                  .fontSize(14)
-                  .fontColor('rgba(255, 255, 255, 0.8)')
-                  .margin({ left: 16, top: 4 })
-              }
-            }
-          }
-          .width('100%')
-          .height(100)
-          .padding(16)
-          .backgroundColor('#00C78C')
-          .borderRadius(16)
-          
-          // 快速锁机卡片
-          Row() {
-            Row() {
-              Text('🔒').fontSize(28)
-              
-              Column() {
-                Text('立刻开始快速锁机')
-                  .fontSize(20)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#FFFFFF')
-                  .margin({ left: 16 })
-                
-                Text('选择锁机时长，并立刻开始锁机')
-                  .fontSize(14)
-                  .fontColor('rgba(255, 255, 255, 0.8)')
-                  .margin({ left: 16, top: 4 })
-              }
-              .layoutWeight(1)
-              
-              Text('📱').fontSize(32)
-            }
-          }
-          .width('100%')
-          .height(100)
-          .padding(16)
-          .backgroundColor('#FF7F6D')
-          .borderRadius(16)
-          
-          // 自定义锁机时间段卡片
-          Row() {
-            Row() {
-              Text('➕').fontSize(28)
-              
-              Column() {
-                Text('添加自定义锁机时间段')
-                  .fontSize(20)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#FFFFFF')
-                  .margin({ left: 16 })
-                
-                Text('在指定时间范围内锁住手机，不做熬夜手机党')
-                  .fontSize(14)
-                  .fontColor('rgba(255, 255, 255, 0.8)')
-                  .margin({ left: 16, top: 4 })
-              }
-            }
-          }
-          .width('100%')
-          .height(100)
-          .padding(16)
-          .backgroundColor('#3D95F9')
-          .borderRadius(16)
-          
-          // 锁机设置按钮
-          Button() {
-            Row() {
-              Text('⚙️').fontSize(20)
-              Text('提升强制性选项 | 锁机设置')
-                .fontSize(16)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('#FFFFFF')
-                .margin({ left: 8 })
-            }
-          }
-          .width('80%')
-          .height(46)
-          .backgroundColor('#FF7F6D')
-          .borderRadius(23)
-          
-          // 提示图片
-          Column() {
-            // 空状态图标
-            Text('📦').fontSize(80)
-            
-            Text('当前没有设置定时锁机')
-              .fontSize(16)
-              .fontWeight(FontWeight.Medium)
-              .margin({ top: 16 })
-            
-            Text('锁机是比学霸模式更严格的自控功能')
-              .fontSize(14)
-              .fontColor('#FF7F6D')
-              .margin({ top: 8 })
-          }
-          .width('100%')
-          .margin({ top: 40 })
-          .alignItems(HorizontalAlign.Center)
-        }
-        .width('100%')
-        .padding(16)
-        .layoutWeight(1)
-        
-        // 底部导航栏
-        Row() {
-          Column() {
-            Text('📅').fontSize(24)
-            Text('待办').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            router.push({ url: 'pages/Index' });
-          })
-          
-          Column() {
-            Text('📝').fontSize(24)
-            Text('待办集').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            router.push({ url: 'pages/Second' });
-          })
-          
-          Column() {
-            Text('🔒').fontSize(24)
-            Text('锁机').fontSize(12).margin({ top: 4 }).fontColor('#3D95F9')
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          
-          Column() {
-            Text('📊').fontSize(24)
-            Text('统计数据').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            router.push({ url: 'pages/StatisticsPage' });
-          })
-          
-          Column() {
-            Text('👤').fontSize(24)
-            Text('我的').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            router.push({ url: 'pages/ProfilePage' });
-          })
-        }
-        .height(60)
-        .width('100%')
+        .height(56)
         .backgroundColor('#FFFFFF')
-        .border({ width: { top: 1 }, color: { top: '#E0E0E0' } })
+
+        // 主要内容区域
+        Column() {
+          if (this.isLocked) {
+            Column() {
+              Text('锁机中...')
+                .fontSize(24)
+                .fontWeight(FontWeight.Bold)
+                .margin({ bottom: 32 })
+
+              Text(this.formatTime(this.remainingTime))
+                .fontSize(72)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#8A2BE2')
+                .margin({ bottom: 48 })
+
+              Text('请专注完成当前任务')
+                .fontSize(18)
+                .fontColor('#666666')
+                .margin({ bottom: 32 })
+
+              Button('解锁')
+                .width('80%')
+                .height(48)
+                .fontSize(18)
+                .fontColor('#FFFFFF')
+                .backgroundColor('#FF4D4F')
+                .borderRadius(24)
+                .onClick(() => {
+                  this.showUnlockConfirm = true;
+                })
+            }
+            .width('100%')
+          } else {
+            Column() {
+              Button('30分钟')
+                .width('80%')
+                .height(48)
+                .fontSize(18)
+                .fontColor('#FFFFFF')
+                .backgroundColor('#8A2BE2')
+                .borderRadius(24)
+                .margin({ bottom: 16 })
+                .onClick(() => {
+                  this.selectedDuration = 30;
+                  this.startLock();
+                })
+
+              Button('1小时')
+                .width('80%')
+                .height(48)
+                .fontSize(18)
+                .fontColor('#FFFFFF')
+                .backgroundColor('#8A2BE2')
+                .borderRadius(24)
+                .margin({ bottom: 16 })
+                .onClick(() => {
+                  this.selectedDuration = 60;
+                  this.startLock();
+                })
+
+              Button('2小时')
+                .width('80%')
+                .height(48)
+                .fontSize(18)
+                .fontColor('#FFFFFF')
+                .backgroundColor('#8A2BE2')
+                .borderRadius(24)
+                .onClick(() => {
+                  this.selectedDuration = 120;
+                  this.startLock();
+                })
+            }
+            .width('100%')
+            .margin({ top: 40 })
+          }
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .backgroundColor('#F8F8F8')
+        .padding(16)
+
+        // 底部导航栏
+        TabBar({ 
+          currentIndex: 2,
+          isLocked: this.isLocked
+        })
       }
       .width('100%')
       .height('100%')
+
+      if (this.showUnlockConfirm) {
+        Column() {
+          Text('确认解锁？')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .margin({ bottom: 16 })
+
+          Text('提前解锁将中断锁机')
+            .fontSize(16)
+            .fontColor('#666666')
+            .margin({ bottom: 24 })
+
+          Row() {
+            Button('取消')
+              .width(120)
+              .height(40)
+              .fontSize(16)
+              .backgroundColor('#F5F5F5')
+              .fontColor('#333333')
+              .margin({ right: 16 })
+              .onClick(() => {
+                this.showUnlockConfirm = false;
+              })
+
+            Button('确认')
+              .width(120)
+              .height(40)
+              .fontSize(16)
+              .backgroundColor('#FF4D4F')
+              .fontColor('#FFFFFF')
+              .onClick(() => {
+                this.unlock();
+                this.showUnlockConfirm = false;
+              })
+          }
+        }
+        .width('80%')
+        .padding(24)
+        .backgroundColor(Color.White)
+        .borderRadius(16)
+        .position({ x: '10%', y: '40%' })
+      }
     }
     .width('100%')
     .height('100%')

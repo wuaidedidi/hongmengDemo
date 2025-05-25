@@ -1,523 +1,307 @@
 import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
+import { TabBar } from '../components/TabBar';
 
 @Entry
 @Component
-export default struct StatisticsPage {
-  @State currentDate: string = '2025-05-12';
-  @State currentMonth: string = '2025年05月';
-  @State currentTabIndex: number = 0; // 0:日, 1:周, 2:月, 3:自定义
-  @State showShareMenu: boolean = false;
-  
+struct StatisticsPage {
+  @State currentTab: number = 0;
+  @State totalFocusTime: number = 0;
+  @State totalFocusCount: number = 0;
+  @State continuousDays: number = 0;
+  @State totalDays: number = 0;
+  @State weeklyData: number[] = [120, 180, 90, 150, 200, 160, 140];
+  @State monthlyData: number[] = Array(30).fill(0).map(() => Math.floor(Math.random() * 200));
+  @State yearlyData: number[] = Array(12).fill(0).map(() => Math.floor(Math.random() * 1000));
+
+  aboutToAppear() {
+    // 模拟加载数据
+    this.loadStatisticsData();
+  }
+
+  loadStatisticsData() {
+    // 模拟从后端获取数据
+    this.totalFocusTime = 3600; // 60小时
+    this.totalFocusCount = 24;
+    this.continuousDays = 7;
+    this.totalDays = 30;
+  }
+
+  formatTime(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}小时${mins}分钟`;
+  }
+
   build() {
-    Stack() {
-      // 背景
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor('#F8F8F8')
-      
-      Column() {
-        // 顶部栏 - 蓝色渐变背景
-        Row() {
-          Text('统计数据')
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-          
-          Blank()
-          
-          Row({ space: 16 }) {
-            Text('⏱️').fontSize(24).fontColor('#FFFFFF')
-            Text('🏆').fontSize(24).fontColor('#FFFFFF')
-            Text('≡').fontSize(24).fontColor('#FFFFFF')
-          }
-        }
-        .width('100%')
-        .height(60)
-        .padding({ left: 16, right: 16 })
-        .backgroundColor('#22B6F7')
-        
-        // 主体内容 - 滚动区域
-        Scroll() {
-          Column({ space: 12 }) {
-            // 累计专注卡片
-            Column() {
-              Row() {
-                Text('累计专注 ')
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#22B6F7')
-                
-                Text('🔍')
-                  .fontSize(20)
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 16, bottom: 8 })
-              
-              // 统计数据
-              Row() {
-                // 次数
-                Column() {
-                  Text('次数')
-                    .fontSize(16)
-                    .fontColor('#666666')
-                  
-                  Text('685')
-                    .fontSize(40)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#22B6F7')
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Center)
-                
-                // 时长
-                Column() {
-                  Text('时长')
-                    .fontSize(16)
-                    .fontColor('#666666')
-                  
-                  Row({ space: 4 }) {
-                    Text('527')
-                      .fontSize(40)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#22B6F7')
-                    
-                    Column() {
-                      Text('小时')
-                        .fontSize(14)
-                        .fontColor('#666666')
-                      
-                      Text('42')
-                        .fontSize(24)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#22B6F7')
-                      
-                      Text('分钟')
-                        .fontSize(14)
-                        .fontColor('#666666')
-                    }
-                    .alignItems(HorizontalAlign.Center)
-                    .justifyContent(FlexAlign.Center)
-                  }
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Center)
-                
-                // 日均时长
-                Column() {
-                  Text('日均时长')
-                    .fontSize(16)
-                    .fontColor('#666666')
-                  
-                  Row({ space: 4 }) {
-                    Text('5')
-                      .fontSize(40)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#22B6F7')
-                    
-                    Column() {
-                      Text('小时')
-                        .fontSize(14)
-                        .fontColor('#666666')
-                      
-                      Text('19')
-                        .fontSize(24)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#22B6F7')
-                      
-                      Text('分钟')
-                        .fontSize(14)
-                        .fontColor('#666666')
-                    }
-                    .alignItems(HorizontalAlign.Center)
-                    .justifyContent(FlexAlign.Center)
-                  }
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Center)
-              }
-              .padding({ bottom: 16 })
-            }
-            .width('100%')
-            .backgroundColor('#FFFFFF')
-            .borderRadius(12)
-            
-            // 当日专注卡片
-            Column() {
-              Row() {
-                Text('当日专注 ')
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#22B6F7')
-                
-                Text(this.currentDate)
-                  .fontSize(16)
-                  .fontColor('#666666')
-                
-                Blank()
-                
-                Text('◀')
-                  .fontSize(20)
-                  .fontColor('#22B6F7')
-                  .onClick(() => {
-                    // 日期前移一天
-                    const date = new Date(this.currentDate);
-                    date.setDate(date.getDate() - 1);
-                    this.currentDate = this.formatDate(date);
-                  })
-                
-                Text('▶')
-                  .fontSize(20)
-                  .fontColor('#22B6F7')
-                  .margin({ left: 16 })
-                  .onClick(() => {
-                    // 日期后移一天
-                    const date = new Date(this.currentDate);
-                    date.setDate(date.getDate() + 1);
-                    this.currentDate = this.formatDate(date);
-                  })
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 16, bottom: 8 })
-              
-              // 统计数据
-              Row() {
-                // 次数
-                Column() {
-                  Text('次数')
-                    .fontSize(16)
-                    .fontColor('#666666')
-                  
-                  Text('0')
-                    .fontSize(40)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#22B6F7')
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Center)
-                
-                // 时长
-                Column() {
-                  Text('时长')
-                    .fontSize(16)
-                    .fontColor('#666666')
-                  
-                  Row({ space: 4 }) {
-                    Text('0')
-                      .fontSize(40)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#22B6F7')
-                    
-                    Column() {
-                      Text('分钟')
-                        .fontSize(14)
-                        .fontColor('#666666')
-                    }
-                    .alignItems(HorizontalAlign.Center)
-                    .justifyContent(FlexAlign.Center)
-                  }
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Center)
-              }
-              .padding({ bottom: 16 })
-            }
-            .width('100%')
-            .backgroundColor('#FFFFFF')
-            .borderRadius(12)
-            
-            // 专注时长分布卡片
-            Column() {
-              Row() {
-                Text('专注时长分布 ')
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#22B6F7')
-                
-                Text(this.currentDate)
-                  .fontSize(16)
-                  .fontColor('#666666')
-                
-                Blank()
-                
-                Text('分享')
-                  .fontSize(16)
-                  .fontColor('#22B6F7')
-                  .onClick(() => {
-                    this.showShareMenu = true;
-                  })
-                
-                Text('◀')
-                  .fontSize(20)
-                  .fontColor('#22B6F7')
-                  .margin({ left: 16 })
-                  .onClick(() => {
-                    // 日期前移一天
-                    const date = new Date(this.currentDate);
-                    date.setDate(date.getDate() - 1);
-                    this.currentDate = this.formatDate(date);
-                  })
-                
-                Text('▶')
-                  .fontSize(20)
-                  .fontColor('#22B6F7')
-                  .margin({ left: 16 })
-                  .onClick(() => {
-                    // 日期后移一天
-                    const date = new Date(this.currentDate);
-                    date.setDate(date.getDate() + 1);
-                    this.currentDate = this.formatDate(date);
-                  })
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 16, bottom: 8 })
-              
-              // 时间分布选项卡
-              Tabs() {
-                TabContent() {
-                  Column() {
-                    // 空状态提示
-                    Column() {
-                      Text('暂无专注数据，点击待办上的开始按钮来专注计时吧')
-                        .fontSize(16)
-                        .fontColor('#999999')
-                        .textAlign(TextAlign.Center)
-                        .margin({ top: 80, bottom: 80 })
-                    }
-                    .width('100%')
-                    .alignItems(HorizontalAlign.Center)
-                    
-                    // 查看专注记录按钮
-                    Button('查看专注记录')
-                      .width('60%')
-                      .height(40)
-                      .fontSize(16)
-                      .fontColor('#FFFFFF')
-                      .backgroundColor('#22B6F7')
-                      .borderRadius(20)
-                      .margin({ bottom: 16 })
-                  }
-                }.tabBar('日')
-                
-                TabContent() {
-                  Column() {
-                    // 周视图
-                    Text('周视图显示区域')
-                      .fontSize(16)
-                      .fontColor('#999999')
-                      .margin({ top: 80, bottom: 80 })
-                  }
-                }.tabBar('周')
-                
-                TabContent() {
-                  Column() {
-                    // 月视图
-                    Text('月视图显示区域')
-                      .fontSize(16)
-                      .fontColor('#999999')
-                      .margin({ top: 80, bottom: 80 })
-                  }
-                }.tabBar('月')
-                
-                TabContent() {
-                  Column() {
-                    // 自定义视图
-                    Text('自定义视图显示区域')
-                      .fontSize(16)
-                      .fontColor('#999999')
-                      .margin({ top: 80, bottom: 80 })
-                  }
-                }.tabBar('自定义')
-              }
-              .barMode(BarMode.Fixed)
-              .barWidth('100%')
-              .backgroundColor('#F5F5F5')
-              .onChange((index: number) => {
-                this.currentTabIndex = index;
-              })
-            }
-            .width('100%')
-            .backgroundColor('#FFFFFF')
-            .borderRadius(12)
-            
-            // 本月专注时段分布卡片
-            Column() {
-              Row() {
-                Text('本月专注时段分布 ')
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#22B6F7')
-                
-                Text(this.currentMonth)
-                  .fontSize(16)
-                  .fontColor('#666666')
-                
-                Blank()
-                
-                Text('◀')
-                  .fontSize(20)
-                  .fontColor('#22B6F7')
-                  .onClick(() => {
-                    // 月份前移一月
-                    const date = new Date(this.currentDate);
-                    date.setMonth(date.getMonth() - 1);
-                    this.currentMonth = this.formatMonth(date);
-                  })
-                
-                Text('▶')
-                  .fontSize(20)
-                  .fontColor('#22B6F7')
-                  .margin({ left: 16 })
-                  .onClick(() => {
-                    // 月份后移一月
-                    const date = new Date(this.currentDate);
-                    date.setMonth(date.getMonth() + 1);
-                    this.currentMonth = this.formatMonth(date);
-                  })
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 16, bottom: 8 })
-              
-              // 月度专注时段分布内容
-              Column() {
-                // 空状态提示
-                Text('暂无专注数据，点击待办上的开始按钮来专注计时吧')
-                  .fontSize(16)
-                  .fontColor('#999999')
-                  .textAlign(TextAlign.Center)
-                  .margin({ top: 80, bottom: 80 })
-              }
-              .width('100%')
-              .alignItems(HorizontalAlign.Center)
-              .padding({ bottom: 16 })
-            }
-            .width('100%')
-            .backgroundColor('#FFFFFF')
-            .borderRadius(12)
-            .margin({ bottom: 16 })
-          }
-          .width('100%')
-          .padding(12)
-        }
-        .width('100%')
-        .layoutWeight(1)
-        
-        // 底部导航栏
-        Row() {
-          Column() {
-            Text('📅').fontSize(24)
-            Text('待办').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
+    Column() {
+      // 顶部标题栏
+      Row() {
+        Image('/common/images/back.png')
+          .width(24)
+          .height(24)
+          .margin({ left: 16 })
           .onClick(() => {
-            router.push({ url: 'pages/Index' });
+            router.back();
           })
-          
-          Column() {
-            Text('📝').fontSize(24)
-            Text('待办集').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            router.push({ url: 'pages/Second' });
-          })
-          
-          Column() {
-            Text('🔒').fontSize(24)
-            Text('锁机').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            router.push({ url: 'pages/LockPage' });
-          })
-          
-          Column() {
-            Text('📊').fontSize(24)
-            Text('统计数据').fontSize(12).margin({ top: 4 }).fontColor('#22B6F7')
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          
-          Column() {
-            Text('👤').fontSize(24)
-            Text('我的').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            router.push({ url: 'pages/ProfilePage' });
-          })
-        }
-        .height(60)
-        .width('100%')
-        .backgroundColor('#FFFFFF')
-        .border({ width: { top: 1 }, color: { top: '#E0E0E0' } })
+
+        Text('专注统计')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#333333')
+          .margin({ left: 16 })
+
+        Blank()
+
+        Text('📊')
+          .fontSize(24)
+          .fontColor('#333333')
+          .margin({ right: 16 })
       }
       .width('100%')
-      .height('100%')
-      
-      // 分享菜单 - 条件渲染
-      if (this.showShareMenu) {
-        Column() {
+      .height(56)
+      .backgroundColor('#FFFFFF')
+
+      // 统计卡片
+      Column() {
+        // 总览数据
+        Row() {
           Column() {
-            Text('分享到')
-              .fontSize(18)
+            Text(this.totalFocusTime.toString())
+              .fontSize(32)
               .fontWeight(FontWeight.Bold)
-              .margin({ top: 16, bottom: 20 })
-            
-            Row({ space: 24 }) {
-              Column() {
-                Text('💬').fontSize(36)
-                Text('微信').fontSize(14).margin({ top: 8 })
-              }.alignItems(HorizontalAlign.Center)
-              
-              Column() {
-                Text('👥').fontSize(36)
-                Text('朋友圈').fontSize(14).margin({ top: 8 })
-              }.alignItems(HorizontalAlign.Center)
-              
-              Column() {
-                Text('🔗').fontSize(36)
-                Text('复制链接').fontSize(14).margin({ top: 8 })
-              }.alignItems(HorizontalAlign.Center)
-            }
-            .padding({ bottom: 20 })
-            
-            Button('取消')
-              .width('80%')
-              .height(44)
-              .fontSize(16)
-              .fontColor('#333333')
-              .backgroundColor('#F5F5F5')
-              .borderRadius(22)
-              .margin({ bottom: 16 })
-              .onClick(() => {
-                this.showShareMenu = false;
-              })
+              .fontColor('#8A2BE2')
+            Text('总专注时长（分钟）')
+              .fontSize(14)
+              .fontColor('#666666')
+              .margin({ top: 4 })
           }
-          .width('90%')
-          .backgroundColor('#FFFFFF')
-          .borderRadius(16)
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Center)
+
+          Column() {
+            Text(this.totalFocusCount.toString())
+              .fontSize(32)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#8A2BE2')
+            Text('专注次数')
+              .fontSize(14)
+              .fontColor('#666666')
+              .margin({ top: 4 })
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Center)
+
+          Column() {
+            Text(this.continuousDays.toString())
+              .fontSize(32)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#8A2BE2')
+            Text('连续天数')
+              .fontSize(14)
+              .fontColor('#666666')
+              .margin({ top: 4 })
+          }
+          .layoutWeight(1)
           .alignItems(HorizontalAlign.Center)
         }
         .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0, 0, 0, 0.5)')
-        .justifyContent(FlexAlign.End)
-        .onClick(() => {
-          this.showShareMenu = false;
-        })
+        .padding(16)
+        .backgroundColor('#FFFFFF')
+        .borderRadius(8)
+        .margin({ top: 16 })
+
+        // 时间范围选择
+        Row() {
+          Text('周')
+            .fontSize(16)
+            .fontColor(this.currentTab === 0 ? '#8A2BE2' : '#666666')
+            .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
+            .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+            .backgroundColor(this.currentTab === 0 ? '#F0E6FF' : 'transparent')
+            .borderRadius(16)
+            .onClick(() => {
+              this.currentTab = 0;
+            })
+
+          Text('月')
+            .fontSize(16)
+            .fontColor(this.currentTab === 1 ? '#8A2BE2' : '#666666')
+            .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
+            .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+            .backgroundColor(this.currentTab === 1 ? '#F0E6FF' : 'transparent')
+            .borderRadius(16)
+            .onClick(() => {
+              this.currentTab = 1;
+            })
+
+          Text('年')
+            .fontSize(16)
+            .fontColor(this.currentTab === 2 ? '#8A2BE2' : '#666666')
+            .fontWeight(this.currentTab === 2 ? FontWeight.Bold : FontWeight.Normal)
+            .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+            .backgroundColor(this.currentTab === 2 ? '#F0E6FF' : 'transparent')
+            .borderRadius(16)
+            .onClick(() => {
+              this.currentTab = 2;
+            })
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+        .margin({ top: 24, bottom: 16 })
+
+        // 图表区域
+        Column() {
+          if (this.currentTab === 0) {
+            // 周视图
+            Row() {
+              ForEach(this.weeklyData, (value: number, index: number) => {
+                Column() {
+                  Text(value.toString())
+                    .fontSize(12)
+                    .fontColor('#666666')
+                    .margin({ bottom: 4 })
+                  Column()
+                    .width(30)
+                    .height(value)
+                    .backgroundColor('#8A2BE2')
+                    .borderRadius(4)
+                  Text(['一', '二', '三', '四', '五', '六', '日'][index])
+                    .fontSize(12)
+                    .fontColor('#666666')
+                    .margin({ top: 4 })
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Center)
+              })
+            }
+            .width('100%')
+            .height(200)
+            .padding(16)
+          } else if (this.currentTab === 1) {
+            // 月视图
+            Grid() {
+              ForEach(this.monthlyData, (value: number, index: number) => {
+                GridItem() {
+                  Column() {
+                    Text(value.toString())
+                      .fontSize(12)
+                      .fontColor('#666666')
+                      .margin({ bottom: 4 })
+                    Column()
+                      .width(20)
+                      .height(value / 2)
+                      .backgroundColor('#8A2BE2')
+                      .borderRadius(4)
+                    Text((index + 1).toString())
+                      .fontSize(12)
+                      .fontColor('#666666')
+                      .margin({ top: 4 })
+                  }
+                  .width('100%')
+                  .alignItems(HorizontalAlign.Center)
+                }
+              })
+            }
+            .columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr')
+            .rowsTemplate('1fr 1fr 1fr 1fr 1fr')
+            .width('100%')
+            .height(300)
+            .padding(16)
+          } else {
+            // 年视图
+            Row() {
+              ForEach(this.yearlyData, (value: number, index: number) => {
+                Column() {
+                  Text(value.toString())
+                    .fontSize(12)
+                    .fontColor('#666666')
+                    .margin({ bottom: 4 })
+                  Column()
+                    .width(30)
+                    .height(value / 5)
+                    .backgroundColor('#8A2BE2')
+                    .borderRadius(4)
+                  Text((index + 1).toString() + '月')
+                    .fontSize(12)
+                    .fontColor('#666666')
+                    .margin({ top: 4 })
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Center)
+              })
+            }
+            .width('100%')
+            .height(200)
+            .padding(16)
+          }
+        }
+        .width('100%')
+        .backgroundColor('#FFFFFF')
+        .borderRadius(8)
+        .margin({ top: 16 })
+
+        // 成就展示
+        Column() {
+          Text('我的成就')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#333333')
+            .margin({ bottom: 16 })
+
+          Row() {
+            Column() {
+              Text('🎯')
+                .fontSize(32)
+                .fontColor('#8A2BE2')
+              Text('连续专注7天')
+                .fontSize(14)
+                .fontColor('#666666')
+                .margin({ top: 8 })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Center)
+
+            Column() {
+              Text('⏰')
+                .fontSize(32)
+                .fontColor('#8A2BE2')
+              Text('累计专注60小时')
+                .fontSize(14)
+                .fontColor('#666666')
+                .margin({ top: 8 })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Center)
+
+            Column() {
+              Text('📅')
+                .fontSize(32)
+                .fontColor('#8A2BE2')
+              Text('坚持30天')
+                .fontSize(14)
+                .fontColor('#666666')
+                .margin({ top: 8 })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Center)
+          }
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor('#FFFFFF')
+        .borderRadius(8)
+        .margin({ top: 16, bottom: 16 })
       }
+      .width('100%')
+      .layoutWeight(1)
+      .padding(16)
+      .backgroundColor('#F8F8F8')
+
+      // 底部导航栏
+      TabBar({ currentIndex: 3 })
     }
     .width('100%')
     .height('100%')
-  }
-  
-  // 格式化日期为 YYYY-MM-DD
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-  
-  // 格式化月份为 YYYY年MM月
-  private formatMonth(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    return `${year}年${month}月`;
   }
 } 

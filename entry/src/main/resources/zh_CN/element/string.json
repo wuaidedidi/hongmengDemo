@@ -1,0 +1,44 @@
+{
+    "string": [
+        {
+            "name": "module_desc",
+            "value": "模块描述"
+        },
+        {
+            "name": "EntryAbility_desc",
+            "value": "待办事项应用"
+        },
+        {
+            "name": "EntryAbility_label",
+            "value": "待办事项"
+        },
+        {
+            "name": "background_running_reason",
+            "value": "需要后台运行以保持任务计时和提醒功能"
+        },
+        {
+            "name": "get_bundle_info_reason",
+            "value": "需要获取应用信息以实现基本功能"
+        },
+        {
+            "name": "notification_reason",
+            "value": "需要发送通知以提醒任务完成情况"
+        },
+        {
+            "name": "internet_reason",
+            "value": "需要网络连接以同步数据"
+        },
+        {
+            "name": "float_window_reason",
+            "value": "需要显示悬浮窗以提供快捷操作"
+        },
+        {
+            "name": "calendar_permission",
+            "value": "需要读取日历以同步待办事项"
+        },
+        {
+            "name": "start_abilities_reason",
+            "value": "需要该权限以打开系统设置页面"
+        }
+    ]
+}

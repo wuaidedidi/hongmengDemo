@@ -1,1216 +1,532 @@
 import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
+import common from '@ohos.app.ability.common';
+import wantConstant from '@ohos.ability.wantConstant';
+import Want from '@ohos.app.ability.Want';
+import { TabBar } from '../components/TabBar';
+import abilityAccessCtrl from '@ohos.abilityAccessCtrl';
+import { PhxSystemActionUtil } from '../utils/PhxSystemActionUtil';
+// TodoList 被移除，因为它与 TodoCollection 关联较多，后续按需调整
+// import { TodoList } from '../view/TodoList';
+
+// 不直接导入Context类型，我们将在需要时使用common模块
 // Index.ets
 
-// 待办项数据类型定义
-class TodoItem {
-  id: number
-  title: string
-  type: string
-  createTime: string
-  isCompleted: boolean
-  focusCount: number = 0
-  focusDuration: number = 0
-  targetDate: string = '2025-05-14'
-  remainDays: number = 1
-  duration: number = 25 // 默认专注时长（分钟）
+// 定义通用错误接口，替代any/unknown类型
+interface CommonError {
+  message: string;
+  code?: string | number;
+  name?: string;
+  stack?: string;
+  cause?: string;
+  detail?: string;
+  // 移除索引签名，ArkTS不支持
+}
 
-  constructor(id: number, title: string, type: string) {
-    this.id = id
-    this.title = title
-    this.type = type
-    this.isCompleted = false
-    // 根据类型设置默认专注时长
-    this.duration = type === '白兔钟' ? 25 : 15
-    
-    // 设置创建时间
-    const now = new Date()
-    this.createTime = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
+// 系统设置跳转参数接口
+interface SettingsWantOptions {
+  action?: string;
+  bundleName?: string;
+  abilityName?: string;
+  uri?: string;
+  parameters?: Record<string, string | number | boolean | Array<string | number | boolean>>;
+}
+
+// Want类型定义
+interface SystemWant {
+  action?: string;
+  bundleName?: string;
+  abilityName?: string;
+  uri?: string;
+  parameters?: Record<string, string | number | boolean | Array<string | number | boolean>>;
+}
+
+// 上下文接口定义
+interface ContextLike {
+  applicationInfo?: Record<string, string>;
+  startAbility: Function;
+}
+
+// FocusTimer页面路由参数定义
+interface FocusTimerRouterParams {
+  taskTitle?: string;
+  title?: string;
+  time?: number; // 注意：FocusTimer 期望的是秒
+  duration?: number; // 这个可能是分钟，需要统一
+  isSequence?: boolean; // Index 页面不再处理序列
+  collectionId?: string; // Index 页面不再处理合集
+  subTaskId?: string; // Index 页面不再处理子任务
+  currentSubTaskIndex?: number; // Index 页面不再处理子任务索引
+  totalSubTasksInCollection?: number; // Index 页面不再处理合集任务总数
+  todoId?: string | number; // 用于简单待办
+}
+
+// 添加自启动设置Want参数接口
+interface StartupSettingsParams {
+  packageName: string;
+}
+
+// TodoOperation页面路由参数定义 (可能仍需调整，取决于简单待办的操作)
+interface TodoOperationParams {
+  todoId: string | number;
+  todoTitle?: string;
+}
+
+// // 子任务编辑页面路由参数 (从Index移除)
+// interface SubTaskEditPageParams {
+//   collectionId: string;
+//   subTaskId: string;
+// }
+
+// // 子任务查找结果接口 (从Index移除)
+// interface SubTaskResult {
+//   collection: TodoCollection | undefined;
+//   subtask: ActualTodoItem | undefined;
+// }
+
+// 定义AboutToAppear方法中使用的参数接口
+interface AboutToAppearParams {
+  action?: string;
+  todoId?: string | number; // 保留用于简单待办返回
+  // sequenceAction?: string; // 移除序列相关
+  // collectionId?: string | number; // 移除合集相关
+  // completedSubTaskIndex?: string | number; // 移除子任务相关
+  // currentSubTaskIndexCompleted?: number; // 移除子任务相关
+  // allSubTasksInCollectionCompleted?: boolean; // 移除合集完成相关
+}
+
+// 定义偏移量类
+class DialogOffset {
+  dx: number;
+  dy: number;
+
+  constructor(dx: number, dy: number) {
+    this.dx = dx;
+    this.dy = dy;
   }
 }
+
+// 权限列表类型
+class PermissionItem {
+  name: string;
+  granted: boolean;
+
+  constructor(name: string, granted: boolean) {
+    this.name = name;
+    this.granted = granted;
+  }
+}
+
+// 路由参数接口
+interface RouterParams {
+  action?: string;
+  todoId?: string | number; // 简单待办ID
+  // 移除序列和合集相关参数
+  // sequenceAction?: string;
+  // collectionId?: string | number;
+  // completedSubTaskIndex?: string | number;
+  // currentSubTaskIndexCompleted?: string;
+  // allSubTasksInCollectionCompleted?: string;
+}
+
+// TodoItem类定义 (这个是 Index.ets 使用的简单待办项)
+class TodoItem {
+  id: number; // 简单待办使用数字ID
+  title: string;
+  type: string; // 例如：'学习', '工作', '锻炼'
+  duration: number = 25; // 默认25分钟
+  isCompleted: boolean = false; // 添加完成状态
+
+  constructor(id: number, title: string, type: string, duration: number = 25, isCompleted: boolean = false) {
+    this.id = id;
+    this.title = title;
+    this.type = type;
+    this.duration = duration;
+    this.isCompleted = isCompleted;
+  }
+
+  formatDuration(): string {
+    return `${this.duration}分钟`;
+  }
+}
+
+// // 新的：单个具体待办事项 (移至 TodoDetail.ets)
+// class ActualTodoItem { ... }
+
+// // 修改的：待办事项合集 (移至 TodoDetail.ets)
+// class TodoCollection { ... }
+
+// 在文件顶部的接口定义部分添加一个通用错误类型
+// 通用错误类型，用于处理各种错误情况
+interface ErrorInfo {
+  message: string;
+  code?: number;
+  details?: string;
+}
+
+// 创建错误信息的辅助方法
+function createErrorInfo(err: Error): ErrorInfo {
+  return { message: err.message };
+}
+
+// 从字符串创建错误信息
+function createErrorInfoFromString(errStr: string): ErrorInfo {
+  return { message: errStr };
+}
+
+// 从对象创建错误信息
+function createErrorInfoFromObject(errObj: CommonError): ErrorInfo {
+  const message = errObj.message ? String(errObj.message) : "未知错误";
+  const code = typeof errObj.code === 'number' ? errObj.code : undefined;
+  const details = String(errObj);
+  return { message, code, details };
+}
+
+// AddSimpleTodoDialog 保持，用于添加简单待办
+@CustomDialog
+struct AddSimpleTodoDialog {
+  @Link todoName: string;
+  @Link todoType: string;
+  @Link todoDuration: number;
+  onConfirm: () => void = () => {};
+  controller?: CustomDialogController;
+
+  build() {
+    Column() {
+      Text("添加新待办").fontSize(20).fontWeight(FontWeight.Bold).margin({ bottom: 20 })
+      TextInput({ placeholder: "待办名称", text: this.todoName })
+        .onChange(val => { this.todoName = val; })
+        .margin({ bottom: 10 })
+      TextInput({ placeholder: "类型 (如: 学习, 工作)", text: this.todoType })
+        .onChange(val => { this.todoType = val; })
+        .margin({ bottom: 10 })
+      TextInput({ placeholder: "时长 (分钟)", text: this.todoDuration.toString() })
+        .type(InputType.Number)
+        .onChange(val => { this.todoDuration = Number(val) || 25; })
+        .margin({ bottom: 20 })
+      Row({ space: 10 }) {
+        Button("取消").onClick(() => this.controller?.close()).layoutWeight(1)
+        Button("确定").onClick(() => {
+          this.onConfirm();
+          this.controller?.close();
+        }).layoutWeight(1).backgroundColor('#8A2BE2')
+      }.width('100%')
+    }
+    .padding(20).width("80%").backgroundColor(Color.White).borderRadius(15)
+  }
+}
+
+// // New CustomDialog for adding TodoCollection (移至 TodoDetail.ets)
+// @CustomDialog
+// struct AddCollectionDialog { ... }
 
 @Entry
 @Component
 struct Index {
   @State currentIndex: number = 0;
-  // 使用一个半透明的粉色背景色
   @State bgColor: string = 'rgba(255, 192, 203, 0.15)';
-  @State isDialogShow: boolean = false;
-  @State todoName: string = '';
-  @State todoType: string = '白兔钟'; // 默认类型
-  @State isClockInMenuShow: boolean = false; // 打卡菜单是否显示
-  @State isClockInStatsShow: boolean = false; // 专注时长打卡统计是否显示
-  @State isPermissionDialogShow: boolean = false; // 权限设置对话框是否显示
-  @State todoItems: TodoItem[] = [
-    new TodoItem(1, '大白猪', '白兔钟'),
-    new TodoItem(2, '劳逸结合', '定目标'),
-    new TodoItem(3, '学习计划', '养习惯'),
-    new TodoItem(4, '工作任务', '定目标')
-  ]; // 待办项列表
-  @State selectedTodoId: number = -1; // 当前选中的待办项ID
-  @State isOperationMenuShow: boolean = false; // 操作菜单是否显示
-  private nextId: number = 5; // 下一个待办项ID
+  // @State showCongratulationsDialog: boolean = false; // 暂时移除，或根据简单待办调整
+  @State isClockInMenuShow: boolean = false; // 保留打卡相关UI状态
+  @State isClockInStatsShow: boolean = false; // 保留打卡相关UI状态
+  @State isPermissionDialogShow: boolean = false; // 保留权限相关UI状态
+
+  // 替换 todoCollections 为 simpleTodos
+  @State simpleTodos: TodoItem[] = [
+    new TodoItem(1, "阅读ArkTS文档", "学习", 30),
+    new TodoItem(2, "编写示例代码", "学习", 45),
+    new TodoItem(3, "跑步", "锻炼", 20)
+  ];
+  private nextTodoId: number = 4; // 用于生成新的简单待办ID
+
+  // @State selectedTodoId: number = -1; // 如果需要跟踪选中的简单待办，可以保留
+  @State isOperationMenuShow: boolean = false; // 保留操作菜单状态 (可能用于简单待办的编辑/删除)
+  // @State showAddTodoModal: boolean = false; // AddSimpleTodoDialog 有自己的controller
+
+  // 用于 AddSimpleTodoDialog 的状态变量
+  @State newSimpleTodoName: string = '';
+  @State newSimpleTodoType: string = '';
+  @State newSimpleTodoDuration: number = 25;
+
+
+  permissionList: PermissionItem[] = [
+    new PermissionItem('通知权限', false),
+    new PermissionItem('日历权限', false),
+    new PermissionItem('位置权限', false)
+  ];
+
+  // // Dialog controller for adding collections (移除)
+  // private addCollectionDialog: CustomDialogController = ... ;
+
+  // Dialog controller for adding simple todos
+  private addSimpleTodoDialogController: CustomDialogController = new CustomDialogController({
+    builder: AddSimpleTodoDialog({
+      todoName: $newSimpleTodoName,
+      todoType: $newSimpleTodoType,
+      todoDuration: $newSimpleTodoDuration,
+      onConfirm: () => { this.addNewSimpleTodo(); }
+    }),
+    autoCancel: true,
+    alignment: DialogAlignment.Center,
+    customStyle: false // 根据需要设置
+  });
 
   aboutToAppear() {
-    // 检查是否有从其他页面返回的参数
-    const params = router.getParams();
-    if (params) {
-      const paramsObj = params as Record<string, string | number>;
-      if (paramsObj.action === 'delete' && paramsObj.todoId !== undefined) {
-        const todoId = paramsObj.todoId as number;
-        const index = this.todoItems.findIndex(item => item.id === todoId);
-        if (index >= 0) {
-          this.todoItems.splice(index, 1);
+    console.info('Index aboutToAppear. CurrentIndex: ' + this.currentIndex);
+    this.currentIndex = 0; // 明确 Index 页面的 currentIndex
+  }
+
+  onPageShow() {
+    console.info("Index page onPageShow triggered");
+    const routeParams = router.getParams() as RouterParams;
+    if (routeParams && typeof routeParams === 'object') {
+      console.info('Index onPageShow router.getParams(): ' + JSON.stringify(routeParams));
+
+      if (routeParams.action === 'focusCompleted' && routeParams.todoId !== undefined) {
+        const completedTodoId = Number(routeParams.todoId);
+        const todo = this.simpleTodos.find(t => t.id === completedTodoId);
+        if (todo) {
+          todo.isCompleted = true;
+          // 更新列表以触发UI刷新
+          this.simpleTodos = [...this.simpleTodos];
+          promptAction.showToast({ message: `任务 "${todo.title}" 专注完成！` });
+
+          // 检查是否所有简单待办都已完成
+          // const allSimpleTodosDone = this.simpleTodos.every(t => t.isCompleted);
+          // if (allSimpleTodosDone) {
+          //   // this.showCongratulationsDialog = true; // 可选择性开启
+          //   // setTimeout(() => { this.showCongratulationsDialog = false; }, 5000);
+          //   promptAction.showToast({ message: "太棒了！所有待办都已完成！" });
+          // }
         }
       }
+      // 移除所有与 sequenceAction, collectionId, completedSubTaskIndex 相关的处理逻辑
+    }
+    this.currentIndex = 0; // 确保在页面显示时 currentIndex 正确
+  }
+
+  addNewSimpleTodo() {
+    if (this.newSimpleTodoName.trim() === '') {
+      promptAction.showToast({ message: '请输入待办名称' });
+      return;
+    }
+    if (this.newSimpleTodoType.trim() === '') {
+      promptAction.showToast({ message: '请输入待办类型' });
+      return;
+    }
+    if (this.newSimpleTodoDuration <= 0) {
+      promptAction.showToast({ message: '请输入有效的时长' });
+      return;
+    }
+
+    const newTodo = new TodoItem(
+      this.nextTodoId++,
+      this.newSimpleTodoName.trim(),
+      this.newSimpleTodoType.trim(),
+      this.newSimpleTodoDuration
+    );
+    this.simpleTodos.push(newTodo);
+    // this.simpleTodos = [...this.simpleTodos]; // 如果直接push不更新UI，则使用此方法
+
+    // 重置输入框
+    this.newSimpleTodoName = '';
+    this.newSimpleTodoType = '';
+    this.newSimpleTodoDuration = 25;
+
+    promptAction.showToast({ message: "新待办已添加" });
+  }
+
+  // // startSequenceTask (移除)
+
+  handlePermissionSettings() {
+    const context = this.getAppAbilityContext();
+    if (!context) {
+      promptAction.showToast({ message: "无法获取应用上下文" });
+      return;
+    }
+    // 跳转到应用详情页
+    PhxSystemActionUtil.goAppInfoSetting(context);
+  }
+
+  // --- System and Permission Methods Placeholder ---
+  getAppAbilityContext(): common.UIAbilityContext | undefined {
+    const context = getContext(this) as common.UIAbilityContext; // 明确类型
+    if (context && typeof context === 'object') {
+      try {
+        // 尝试将context转为UIAbilityContext类型
+        const uiContext = context as common.UIAbilityContext;
+        // 检查必要的属性是否存在
+        if (uiContext.applicationInfo !== undefined && typeof uiContext.startAbility === 'function') {
+          return uiContext;
+        }
+      } catch (e) {
+        console.error("Context conversion to UIAbilityContext error: " + ((e as Error).message || String(e)));
+      }
+    }
+    console.warn("Failed to get a valid UIAbilityContext.");
+    return undefined;
+  }
+
+  async startSystemSettingsGuidanceFlow() {
+    console.info('[MyTestApp] startSystemSettingsGuidanceFlow: Method executing with new logic.');
+    const context = this.getAppAbilityContext();
+    if (!context) {
+      promptAction.showToast({ message: "无法获取应用上下文" });
+      return;
+    }
+
+    const currentBundleName = context.applicationInfo?.name || context.abilityInfo?.bundleName || '';
+    if (!currentBundleName) {
+      promptAction.showToast({ message: "无法获取当前应用包名" });
+      console.error('[MyTestApp] 无法获取当前应用包名');
+      return;
+    }
+    console.info(`[MyTestApp] 当前应用包名: ${currentBundleName}`);
+
+    // 依次尝试所有常见action
+    const tryWants: Want[] = [
+      { action: 'ohos.settings.action.application_details_settings', parameters: { bundleName: currentBundleName } },
+      { action: 'ohos.settings.action.APP_DETAILS', parameters: { bundleName: currentBundleName } },
+      { action: 'ohos.settings.action.APP_PERMISSION_MANAGER', parameters: { bundleName: currentBundleName } },
+      { action: 'ohos.settings.action.APP_NOTIFICATION_SETTINGS', parameters: { bundleName: currentBundleName } },
+      { action: 'ohos.settings.action.SETTINGS' }
+    ];
+    let success = false;
+    for (let want of tryWants) {
+      try {
+        console.info(`[MyTestApp] 尝试action: ${JSON.stringify(want)}`);
+        await context.startAbility(want as Want);
+        console.info('[MyTestApp] 跳转设置相关页面成功');
+        success = true;
+        break;
+      } catch (e) {
+        console.error(`[MyTestApp] 跳转失败: ${e}`);
+        // 继续尝试下一个
+      }
+    }
+    if (!success) {
+      promptAction.showToast({
+        message: "无法打开设置页面，请手动前往设置",
+        duration: 3000
+      });
     }
   }
 
+  createSystemWant(options: SettingsWantOptions): SystemWant {
+    // This function should create a Want object based on options
+    // Placeholder implementation
+    let want: Want = {
+        bundleName: options.bundleName,
+        abilityName: options.abilityName,
+        uri: options.uri,
+        parameters: options.parameters,
+        action: options.action
+    };
+    // Make sure Want conforms to SystemWant, or SystemWant is an interface Want implements
+    return want as SystemWant;
+  }
+  // --- End of Placeholder ---
+
   build() {
     Stack() {
-      // 整页背景
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.bgColor)
-      
       Column() {
         // 顶部标题栏
         Row() {
-          Text('待办')
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-          
+          Text('待办列表')
+            .fontSize(22).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
           Blank()
-          
           Row({ space: 16 }) {
             Row() {
-              Text('必开')
-                .fontSize(14)
-                .fontColor('#FFFFFF')
-              Text('权限')
-                .fontSize(14)
-                .fontColor('#FFFFFF')
+              Text('必开').fontSize(14).fontColor('#FFFFFF')
+              Text('权限').fontSize(14).fontColor('#FFFFFF')
             }
             .backgroundColor('rgba(255, 255, 255, 0.2)')
-            .borderRadius(12)
-            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            .borderRadius(12).padding({ left: 8, right: 8, top: 4, bottom: 4 })
             .margin({ right: 4 })
+            .onClick(() => { this.handlePermissionSettings(); })
+            Text('✓').fontSize(24).fontColor('#FFFFFF')
+              .onClick(() => { promptAction.showToast({message: "打卡菜单待实现"}); })
+            Text('+').fontSize(24).fontColor('#FFFFFF')
             .onClick(() => {
-              this.isPermissionDialogShow = true;
-            })
-            
-            Text('✓')
-              .fontSize(24)
-              .fontColor('#FFFFFF')
-              .onClick(() => {
-                this.isClockInMenuShow = true;
-              })
-            Text('+')
-              .fontSize(24)
-              .fontColor('#FFFFFF')
-              .onClick(() => {
-                this.isDialogShow = true;
+                this.newSimpleTodoName = '';
+                this.newSimpleTodoType = '';
+                this.newSimpleTodoDuration = 25;
+                this.addSimpleTodoDialogController.open();
               })
             Text('≡').fontSize(24).fontColor('#FFFFFF')
+              .onClick(() => { promptAction.showToast({message: "更多菜单待实现"}); })
           }
         }
         .width('100%')
         .height(50)
         .padding({ left: 16, right: 16 })
-        .linearGradient({
-          angle: 90,
-          colors: [['#8A2BE2', 0.0], ['#FF1493', 1.0]]
-        })
-        
-        // 任务列表部分
-        Column() {
-          // 列表卡片
-          Column({ space: 16 }) {
-            // 循环渲染待办项
-            ForEach(this.todoItems, (item: TodoItem) => {
+        .linearGradient({ angle: 90, colors: [['#8A2BE2', 0.0], ['#FF1493', 1.0]] })
+
+        // 内容区域
+        Scroll() {
+          Column({ space: 10 }) {
+            ForEach(this.simpleTodos, (todo: TodoItem) => {
               Row() {
                 Column() {
-                  Text(item.title)
-                    .fontSize(22)
+                  Text(todo.title)
+                    .fontSize(18)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#222222')
-                  
-                  Text(`${item.duration}分钟`)
+                    .fontColor('#333333')
+                    .decoration({type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None })
+                  Text(`${todo.type} - ${todo.formatDuration()}`)
                     .fontSize(14)
                     .fontColor('#666666')
-                    .margin({ top: 4 })
+                    .decoration({type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None })
+                    .margin({top: 4})
                 }
-                .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
-                
-                if (item.type === '白兔钟') {
-                  Text('📊').fontSize(24).margin({ right: 8 })
-                  Text('⚙️').fontSize(24).margin({ right: 8 })
-                  Button() {
-                    Text('开始')
-                      .fontSize(16)
-                      .fontColor('#FFFFFF')
-                  }
-                  .backgroundColor('#8A2BE2')
-                  .borderRadius(16)
-                  .width(70)
-                  .height(36)
+                .alignItems(HorizontalAlign.Start)
+
+                Button('开始专注')
+                  .fontSize(14)
+                  .fontColor(Color.White)
+                  .backgroundColor('#4682B4')
+                  .borderRadius(12)
+                  .height(32)
+                  .padding({left: 8, right: 8})
+                  .margin({left: 10})
                   .onClick(() => {
-                    try {
-                      const result = router.pushUrl({
-                        url: 'pages/FocusTimer',
-                        params: {
-                          title: item.title,
-                          time: item.duration * 60 // 使用待办项的实际时长
-                        }
-                      });
-                      console.info(`跳转结果: ${result}`);
-                    } catch (error) {
-                      console.error(`跳转FocusTimer页面出错: ${JSON.stringify(error)}`);
-                    }
+                      const params: FocusTimerRouterParams = {
+                      title: todo.title,
+                      taskTitle: todo.title,
+                      time: todo.duration * 60,
+                      todoId: todo.id,
+                      isSequence: false
+                    };
+                    router.pushUrl({ url: 'pages/FocusTimer', params: params })
+                      .catch((err: Error) => { console.error(`跳转FocusTimer出错: ${err.message}`); });
                   })
-                } else {
-                  Text('⏱️').fontSize(24).margin({ right: 8 })
-                  Text('✏️').fontSize(24).margin({ right: 8 })
-                  Button() {
-                    Text('开始')
-                      .fontSize(16)
-                      .fontColor('#FFFFFF')
-                  }
-                  .backgroundColor('#8A2BE2')
-                  .borderRadius(16)
-                  .width(70)
-                  .height(36)
-                  .onClick(() => {
-                    try {
-                      const result = router.pushUrl({
-                        url: 'pages/FocusTimer',
-                        params: {
-                          title: item.title,
-                          time: item.duration * 60 // 使用待办项的实际时长
-                        }
-                      });
-                      console.info(`跳转结果: ${result}`);
-                    } catch (error) {
-                      console.error(`跳转FocusTimer页面出错: ${JSON.stringify(error)}`);
-                    }
-                  })
-                }
+                  .visibility(todo.isCompleted ? Visibility.Hidden : Visibility.Visible)
               }
-              .height(60)
               .width('100%')
-              .backgroundColor('#FFFFFF')
+              .backgroundColor(Color.White)
               .borderRadius(8)
-              .padding({ left: 16, right: 16 })
-              .alignItems(VerticalAlign.Center)
-              .margin({ top: 8, left: 8, right: 8 })
-              .gesture(
-                LongPressGesture()
-                  .onAction(() => {
-                    try {
-                      const result = router.pushUrl({
-                        url: 'pages/TodoOperation',
-                        params: {
-                          todoId: item.id
-                        }
-                      });
-                      console.info(`跳转到TodoOperation结果: ${result}`);
-                    } catch (error) {
-                      console.error(`跳转TodoOperation页面出错: ${JSON.stringify(error)}`);
-                    }
-                  })
-              )
-            })
+              .padding(12)
+            }, (todo: TodoItem) => todo.id.toString())
           }
           .width('100%')
-          
-          // 浮动按钮提示
-          Row() {
-            Text('双击编辑 AI 组件')
-              .fontSize(16)
-              .fontColor('#FFFFFF')
-              .fontWeight(FontWeight.Medium)
-          }
-          .backgroundColor('rgba(138, 43, 226, 0.8)')
-          .borderRadius(24)
-          .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-          .position({ x: '30%', y: '50%' })
+          .padding(16)
         }
-        .width('100%')
         .layoutWeight(1)
-        .padding(16)
-        
+
         // 底部导航栏
-        Row() {
-          Column() {
-            Text('📅').fontSize(24)
-            Text('待办').fontSize(12).margin({ top: 4 }).fontColor('#8A2BE2')
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          
-          Column() {
-            Text('📝').fontSize(24)
-            Text('待办事项').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            try {
-              router.push({ url: 'pages/TodoDetail' });
-            } catch (error) {
-              console.error(`跳转TodoDetail页面出错: ${JSON.stringify(error)}`);
-            }
-          })
-          
-          Column() {
-            Text('🔒').fontSize(24)
-            Text('锁机').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            try {
-              router.push({ url: 'pages/LockPage' });
-            } catch (error) {
-              console.error(`跳转LockPage页面出错: ${JSON.stringify(error)}`);
-            }
-          })
-          
-          Column() {
-            Text('📊').fontSize(24)
-            Text('统计数据').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            try {
-              router.push({ url: 'pages/StatisticsPage' });
-            } catch (error) {
-              console.error(`跳转StatisticsPage页面出错: ${JSON.stringify(error)}`);
-            }
-          })
-          
-          Column() {
-            Text('👤').fontSize(24)
-            Text('我的').fontSize(12).margin({ top: 4 })
-          }.layoutWeight(1).justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            try {
-              router.push({ url: 'pages/ProfilePage' });
-            } catch (error) {
-              console.error(`跳转ProfilePage页面出错: ${JSON.stringify(error)}`);
-            }
-          })
-        }
-        .height(56)
+        TabBar({ currentIndex: 0 })
+      }
         .width('100%')
-        .backgroundColor('#FFFFFF')
-        .border({ width: { top: 1 }, color: { top: '#E0E0E0' } })
+      .height('100%')
+      .backgroundColor(this.bgColor)
       }
       .width('100%')
       .height('100%')
-      
-      // 添加待办弹窗
-      if (this.isDialogShow) {
-        Column() {
-          Column() {
-            // 弹窗标题
-            Text('添加待办')
-              .fontSize(18)
-              .fontWeight(FontWeight.Bold)
-              .margin({ top: 16, bottom: 20 })
-            
-            // 输入框
-            TextInput({ placeholder: '请输入待办名称' })
-              .width('90%')
-              .height(50)
-              .fontSize(16)
-              .placeholderFont({ size: 16 })
-              .borderRadius(8)
-              .backgroundColor('#F5F5F5')
-              .padding({ left: 16, right: 16 })
-              .margin({ bottom: 20 })
-              .onChange((value: string) => {
-                this.todoName = value;
-              })
-            
-            // 第一行按钮
-            Row({ space: 12 }) {
-              Button('白兔钟')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor(this.todoType === '白兔钟' ? '#8A2BE2' : '#F5F5F5')
-                .fontColor(this.todoType === '白兔钟' ? '#FFFFFF' : '#333333')
-                .onClick(() => {
-                  this.todoType = '白兔钟';
-                })
-              
-              Button('定目标')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor(this.todoType === '定目标' ? '#8A2BE2' : '#F5F5F5')
-                .fontColor(this.todoType === '定目标' ? '#FFFFFF' : '#333333')
-                .onClick(() => {
-                  this.todoType = '定目标';
-                })
-              
-              Button('养习惯')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor(this.todoType === '养习惯' ? '#8A2BE2' : '#F5F5F5')
-                .fontColor(this.todoType === '养习惯' ? '#FFFFFF' : '#333333')
-                .onClick(() => {
-                  this.todoType = '养习惯';
-                })
-            }
-            .width('90%')
-            .margin({ bottom: 12 })
-            
-            // 第二行按钮
-            Row({ space: 12 }) {
-              Button('倒计时')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor('#F5F5F5')
-                .fontColor('#333333')
-              
-              Button('正向计时')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor('#F5F5F5')
-                .fontColor('#333333')
-              
-              Button('不计时')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor('#F5F5F5')
-                .fontColor('#333333')
-            }
-            .width('90%')
-            .margin({ bottom: 12 })
-            
-            // 第三行按钮
-            Row({ space: 12 }) {
-              Button('25分钟')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor('#F5F5F5')
-                .fontColor('#333333')
-              
-              Button('35分钟')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor('#F5F5F5')
-                .fontColor('#333333')
-              
-              Button('自定义')
-                .height(40)
-                .layoutWeight(1)
-                .borderRadius(8)
-                .backgroundColor('#F5F5F5')
-                .fontColor('#333333')
-            }
-            .width('90%')
-            .margin({ bottom: 16 })
-            
-            // 确认和取消按钮
-            Row({ space: 16 }) {
-              Button('取消')
-                .width('40%')
-                .height(45)
-                .borderRadius(22)
-                .backgroundColor('#F5F5F5')
-                .fontColor('#333333')
-                .onClick(() => {
-                  this.isDialogShow = false;
-                })
-              
-              Button('确认')
-                .width('40%')
-                .height(45)
-                .borderRadius(22)
-                .backgroundColor('#8A2BE2')
-                .fontColor('#FFFFFF')
-                .onClick(() => {
-                  // 添加新待办项
-                  if (this.todoName.trim().length > 0) {
-                    const newTodo = new TodoItem(this.nextId++, this.todoName, this.todoType);
-                    this.todoItems.push(newTodo);
-                    this.todoName = '';
-                    this.todoType = '白兔钟';
-                  }
-                  this.isDialogShow = false;
-                })
-            }
-            .margin({ bottom: 16 })
-          }
-          .width('85%')
-          .backgroundColor('#FFFFFF')
-          .borderRadius(16)
-          .padding({ top: 10, bottom: 10 })
-          .alignItems(HorizontalAlign.Center)
-        }
-        .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0, 0, 0, 0.5)')
-        .justifyContent(FlexAlign.Center)
-        .onClick(() => {
-          this.isDialogShow = false;
-        })
-      }
-      
-      // 打卡菜单
-      if (this.isClockInMenuShow) {
-        Column() {
-          Column() {
-            // 打卡选项
-            Text('早起打卡')
-              .fontSize(18)
-              .fontWeight(FontWeight.Medium)
-              .width('100%')
-              .padding(16)
-              .borderRadius({ topLeft: 16, topRight: 16 })
-              .backgroundColor('#FFFFFF')
-              .onClick(() => {
-                // 处理早起打卡逻辑
-                this.isClockInMenuShow = false;
-              })
-            
-            Divider().color('#EEEEEE').height(1)
-            
-            Text('今日专注时长打卡')
-              .fontSize(18)
-              .fontWeight(FontWeight.Medium)
-              .width('100%')
-              .padding(16)
-              .backgroundColor('#FFFFFF')
-              .onClick(() => {
-                this.isClockInMenuShow = false;
-                this.isClockInStatsShow = true; // 显示专注时长统计
-              })
-            
-            Divider().color('#EEEEEE').height(1)
-            
-            Text('睡眠打卡')
-              .fontSize(18)
-              .fontWeight(FontWeight.Medium)
-              .width('100%')
-              .padding(16)
-              .borderRadius({ bottomLeft: 16, bottomRight: 16 })
-              .backgroundColor('#FFFFFF')
-              .onClick(() => {
-                // 处理睡眠打卡逻辑
-                this.isClockInMenuShow = false;
-              })
-          }
-          .width('80%')
-          .margin(16)
-          .position({ x: '10%', y: '6%' })
-        }
-        .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0, 0, 0, 0.5)')
-        .onClick(() => {
-          this.isClockInMenuShow = false;
-        })
-      }
-      
-      // 权限设置对话框
-      if (this.isPermissionDialogShow) {
-        Column() {
-          Column() {
-            // 标题和关闭按钮
-            Row() {
-              Text('请依次全部开启~')
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#E74C3C')
-              
-              Blank()
-              
-              Text('✖')
-                .fontSize(22)
-                .fontColor('#666666')
-                .onClick(() => {
-                  this.isPermissionDialogShow = false;
-                })
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 16, bottom: 8 })
-            
-            // 权限说明
-            Text('若不设置，计时或锁机会被系统休眠而无法正常运行')
-              .fontSize(16)
-              .fontColor('#333333')
-              .margin({ bottom: 8 })
-              .padding({ left: 16, right: 16 })
-              .width('100%')
-              .textAlign(TextAlign.Start)
-            
-            Text('请严格按提示设置权限，不要自己去找权限哦，自己找很可能找不全哦')
-              .fontSize(16)
-              .fontColor('#333333')
-              .margin({ bottom: 24 })
-              .padding({ left: 16, right: 16 })
-              .width('100%')
-              .textAlign(TextAlign.Start)
-            
-            // 第一个权限选项
-            Column() {
-              Text('设置允许后台运行')
-                .fontSize(18)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('#03A9F4')
-                .width('100%')
-                .textAlign(TextAlign.Start)
-                .margin({ bottom: 4 })
-              
-              Text('防止锁屏后被休眠，使提醒更加及时')
-                .fontSize(14)
-                .fontColor('#666666')
-                .width('100%')
-                .textAlign(TextAlign.Start)
-            }
-            .width('100%')
-            .backgroundColor('#E3F2FD')
-            .borderRadius(8)
-            .padding(16)
-            .margin({ bottom: 12, left: 16, right: 16 })
-            .onClick(() => {
-              // 处理权限设置逻辑
-            })
-            
-            // 第二个权限选项
-            Column() {
-              Text('设置允许启动')
-                .fontSize(18)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('#03A9F4')
-                .width('100%')
-                .textAlign(TextAlign.Start)
-                .margin({ bottom: 4 })
-              
-              Text('允许启动定时提醒或锁机界面')
-                .fontSize(14)
-                .fontColor('#666666')
-                .width('100%')
-                .textAlign(TextAlign.Start)
-            }
-            .width('100%')
-            .backgroundColor('#E3F2FD')
-            .borderRadius(8)
-            .padding(16)
-            .margin({ bottom: 12, left: 16, right: 16 })
-            .onClick(() => {
-              // 处理权限设置逻辑
-            })
-            
-            // 第三个权限选项
-            Column() {
-              Text('在多任务界面加锁')
-                .fontSize(18)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('#03A9F4')
-                .width('100%')
-                .textAlign(TextAlign.Start)
-                .margin({ bottom: 4 })
-              
-              Text('防止被一键清理')
-                .fontSize(14)
-                .fontColor('#666666')
-                .width('100%')
-                .textAlign(TextAlign.Start)
-            }
-            .width('100%')
-            .backgroundColor('#E3F2FD')
-            .borderRadius(8)
-            .padding(16)
-            .margin({ bottom: 16, left: 16, right: 16 })
-            .onClick(() => {
-              // 处理权限设置逻辑
-            })
-            
-            // 底部确认文字
-            Text('权限已设置完成，不再显示提示')
-              .fontSize(16)
-              .fontColor('#666666')
-              .textAlign(TextAlign.Center)
-              .margin({ bottom: 16 })
-          }
-          .width('90%')
-          .backgroundColor('#FFFFFF')
-          .borderRadius(16)
-        }
-        .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0, 0, 0, 0.5)')
-        .justifyContent(FlexAlign.Center)
-        .onClick(() => {
-          // 点击空白区域不关闭
-        })
-      }
-      
-      // 专注时长打卡统计
-      if (this.isClockInStatsShow) {
-        Column() {
-          Column() {
-            // 顶部标题和按钮栏
-            Row() {
-              Text('打卡 | 保存')
-                .fontSize(18)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#000000')
-              
-              Blank()
-              
-              Row({ space: 12 }) {
-                Text('⚪').fontSize(24)
-                Text('⬇️').fontSize(24)
-                Text('🔄').fontSize(24)
-                Text('🔄').fontSize(24)
-                Text('✖️').fontSize(24).onClick(() => {
-                  this.isClockInStatsShow = false;
-                })
-              }
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-            .border({ width: { bottom: 1 }, color: { bottom: '#EEEEEE' } })
-            
-            // 日期显示
-            Column({ space: 8 }) {
-              Text('2025年05月13日')
-                .fontSize(32)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#000000')
-              
-              Row() {
-                Text('共专注99天')
-                  .fontSize(14)
-                  .fontColor('#FFFFFF')
-                  .backgroundColor('#FF6B6B')
-                  .borderRadius(16)
-                  .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                  .margin({ right: 8 })
-                
-                Text('连续专注1天')
-                  .fontSize(14)
-                  .fontColor('#FFFFFF')
-                  .backgroundColor('#FFD166')
-                  .borderRadius(16)
-                  .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-              }
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 16, bottom: 16 })
-            
-            // 计时统计
-            Row() {
-              Column() {
-                Text('当日专注')
-                  .fontSize(16)
-                  .fontColor('#666666')
-                  .margin({ bottom: 8 })
-                
-                Text('次数')
-                  .fontSize(14)
-                  .fontColor('#999999')
-                  .margin({ bottom: 4 })
-                
-                Text('0')
-                  .fontSize(34)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#000000')
-              }
-              .alignItems(HorizontalAlign.Center)
-              .layoutWeight(1)
-              
-              Column() {
-                Text('时长')
-                  .fontSize(14)
-                  .fontColor('#999999')
-                  .margin({ bottom: 4 })
-                
-                Row() {
-                  Text('0')
-                    .fontSize(34)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#000000')
-                  Text('分钟')
-                    .fontSize(14)
-                    .fontColor('#999999')
-                    .alignSelf(ItemAlign.End)
-                    .margin({ bottom: 6 })
-                }
-              }
-              .alignItems(HorizontalAlign.Center)
-              .layoutWeight(1)
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-            
-            // 分布图/时间轴切换
-            Row() {
-              Text('分布图')
-                .fontSize(16)
-                .fontColor('#8A2BE2')
-                .fontWeight(FontWeight.Medium)
-                .backgroundColor('#F0E6FF')
-                .borderRadius(16)
-                .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-                .width('50%')
-                .textAlign(TextAlign.Center)
-              
-              Text('时间轴')
-                .fontSize(16)
-                .fontColor('#666666')
-                .fontWeight(FontWeight.Medium)
-                .backgroundColor('#F5F5F5')
-                .borderRadius(16)
-                .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-                .width('50%')
-                .textAlign(TextAlign.Center)
-            }
-            .width('85%')
-            .height(40)
-            .margin({ top: 10, bottom: 10 })
-            .backgroundColor('#EFEFEF')
-            .borderRadius(20)
-            
-            // 时长分布统计标题
-            Text('专注时长分布 2025-05-13')
-              .fontSize(16)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('#333333')
-              .alignSelf(ItemAlign.Start)
-              .margin({ left: 16, top: 10, bottom: 10 })
-            
-            // 统计时间周期切换
-            Row() {
-              Text('日')
-                .fontSize(16)
-                .fontColor('#8A2BE2')
-                .fontWeight(FontWeight.Medium)
-                .backgroundColor('#F0E6FF')
-                .borderRadius(16)
-                .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-              
-              Text('周')
-                .fontSize(16)
-                .fontColor('#666666')
-                .fontWeight(FontWeight.Medium)
-                .backgroundColor('#F5F5F5')
-                .borderRadius(16)
-                .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-                .margin({ left: 8, right: 8 })
-              
-              Text('月')
-                .fontSize(16)
-                .fontColor('#666666')
-                .fontWeight(FontWeight.Medium)
-                .backgroundColor('#F5F5F5')
-                .borderRadius(16)
-                .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-              
-              Text('自定义')
-                .fontSize(16)
-                .fontColor('#666666')
-                .fontWeight(FontWeight.Medium)
-                .backgroundColor('#F5F5F5')
-                .borderRadius(16)
-                .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-                .margin({ left: 8 })
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-            .justifyContent(FlexAlign.Start)
-            
-            // 统计图表（这里用一个空的容器表示，实际项目中可替换为真实图表）
-            Column() {
-              Text('暂无专注数据，点击待办上的开始按钮来开始你的专注计时吧')
-                .fontSize(14)
-                .fontColor('#999999')
-                .textAlign(TextAlign.Center)
-                .margin(16)
-            }
-            .width('100%')
-            .height(200)
-            .backgroundColor('#F8F8F8')
-            .justifyContent(FlexAlign.Center)
-            .alignItems(HorizontalAlign.Center)
-            
-            // 底部信息
-            Text('处处留心皆学问.')
-              .fontSize(14)
-              .fontColor('#999999')
-              .margin({ top: 16, bottom: 6 })
-            
-            Text('习惯养成 学霸必备-番茄TODO')
-              .fontSize(12)
-              .fontColor('#8A2BE2')
-          }
-          .width('100%')
-          .backgroundColor('#FFFFFF')
-          .borderRadius(16)
-          .padding({ bottom: 16 })
-        }
-        .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0, 0, 0, 0.5)')
-        .onClick(() => {
-          // 点击空白区域关闭弹窗
-          this.isClockInStatsShow = false;
-        })
-      }
-
-      // 待办项操作菜单
-      if (this.isOperationMenuShow) {
-        Column() {
-          Column() {
-            // 顶部显示待办号码
-            Row() {
-              Text('22')
-                .fontSize(30)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#000000')
-                .margin({ left: 16 })
-              
-              Blank()
-              
-              Row({ space: 16 }) {
-                Column() {
-                  Text('⏰')
-                    .fontSize(26)
-                    .fontColor('#03A9F4')
-                  Text('定时提醒/专注')
-                    .fontSize(12)
-                    .fontColor('#333333')
-                    .margin({ top: 4 })
-                }
-                .alignItems(HorizontalAlign.Center)
-                
-                Column() {
-                  Text('🖼️')
-                    .fontSize(26)
-                    .fontColor('#03A9F4')
-                  Text('更换背景')
-                    .fontSize(12)
-                    .fontColor('#333333')
-                    .margin({ top: 4 })
-                }
-                .alignItems(HorizontalAlign.Center)
-                
-                Column() {
-                  Text('📋')
-                    .fontSize(26)
-                    .fontColor('#03A9F4')
-                  Text('独立白名单')
-                    .fontSize(12)
-                    .fontColor('#333333')
-                    .margin({ top: 4 })
-                }
-                .alignItems(HorizontalAlign.Center)
-                .margin({ right: 16 })
-              }
-            }
-            .width('100%')
-            .height(100)
-            .backgroundColor('#FFFFFF')
-            .padding({ top: 20 })
-            
-            // 操作按钮行
-            Row() {
-              Button('编辑')
-                .fontSize(16)
-                .fontColor('#03A9F4')
-                .backgroundColor('#E1F5FE')
-                .borderRadius(20)
-                .height(40)
-                .width('33.3%')
-                .margin(5)
-              
-              Button('排序 | 移动')
-                .fontSize(16)
-                .fontColor('#03A9F4')
-                .backgroundColor('#E1F5FE')
-                .borderRadius(20)
-                .height(40)
-                .width('33.3%')
-                .margin(5)
-              
-              Button('删除')
-                .fontSize(16)
-                .fontColor('#FF5252')
-                .backgroundColor('#FFEBEE')
-                .borderRadius(20)
-                .height(40)
-                .width('33.3%')
-                .margin(5)
-                .onClick(() => {
-                  // 删除选中的待办项
-                  if (this.selectedTodoId >= 0) {
-                    const index = this.todoItems.findIndex(item => item.id === this.selectedTodoId);
-                    if (index >= 0) {
-                      this.todoItems.splice(index, 1);
-                    }
-                  }
-                  this.isOperationMenuShow = false;
-                })
-            }
-            .width('100%')
-            .padding({ left: 10, right: 10, top: 10, bottom: 10 })
-            
-            // 功能区域
-            Row() {
-              Column() {
-                Text('📊')
-                  .fontSize(32)
-                  .fontColor('#03A9F4')
-                Text('专注历史记录')
-                  .fontSize(14)
-                  .fontColor('#03A9F4')
-                  .margin({ top: 8 })
-              }
-              .width('50%')
-              .backgroundColor('#E1F5FE')
-              .borderRadius(8)
-              .padding(20)
-              .margin(5)
-              
-              Column() {
-                Text('📈')
-                  .fontSize(32)
-                  .fontColor('#03A9F4')
-                Text('数据统计')
-                  .fontSize(14)
-                  .fontColor('#03A9F4')
-                  .margin({ top: 8 })
-              }
-              .width('50%')
-              .backgroundColor('#E1F5FE')
-              .borderRadius(8)
-              .padding(20)
-              .margin(5)
-            }
-            .width('100%')
-            .padding({ left: 10, right: 10 })
-            
-            // 统计信息区域
-            Column() {
-              Text('累计专注')
-                .fontSize(18)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#333333')
-                .width('100%')
-                .textAlign(TextAlign.Center)
-                .margin({ top: 16, bottom: 16 })
-              
-              Row() {
-                Text('0')
-                  .fontSize(40)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#03A9F4')
-                Text('次')
-                  .fontSize(16)
-                  .fontColor('#666666')
-                  .margin({ left: 4, bottom: 8 })
-                  .alignSelf(ItemAlign.End)
-              }
-              .justifyContent(FlexAlign.Center)
-              .width('50%')
-              
-              Row() {
-                Text('0')
-                  .fontSize(40)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#03A9F4')
-                Text('分钟')
-                  .fontSize(16)
-                  .fontColor('#666666')
-                  .margin({ left: 4, bottom: 8 })
-                  .alignSelf(ItemAlign.End)
-              }
-              .justifyContent(FlexAlign.Center)
-              .width('50%')
-            }
-            .width('100%')
-            .alignItems(HorizontalAlign.Center)
-            
-            // 定时提醒信息
-            Column() {
-              Text('定时提醒 | 定时学霸模式')
-                .fontSize(16)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#03A9F4')
-                .width('100%')
-                .textAlign(TextAlign.Center)
-                .margin({ top: 16, bottom: 8 })
-              
-              Text('没有设置定时提醒或定时学霸')
-                .fontSize(14)
-                .fontColor('#666666')
-                .width('100%')
-                .textAlign(TextAlign.Center)
-                .margin({ bottom: 16 })
-              
-              Text('目标截止日期 2025-05-14 剩余 1天')
-                .fontSize(16)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#03A9F4')
-                .width('100%')
-                .textAlign(TextAlign.Center)
-                .margin({ bottom: 16 })
-              
-              Row() {
-                Column() {
-                  Text('计划内已完成')
-                    .fontSize(12)
-                    .fontColor('#666666')
-                    .margin({ bottom: 4 })
-                  
-                  Row() {
-                    Text('0')
-                      .fontSize(24)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#333333')
-                    Text('分钟')
-                      .fontSize(12)
-                      .fontColor('#666666')
-                      .alignSelf(ItemAlign.End)
-                      .margin({ left: 4, bottom: 4 })
-                  }
-                }
-                .width('33.3%')
-                .alignItems(HorizontalAlign.Center)
-                
-                Column() {
-                  Text('长期计划完成度')
-                    .fontSize(12)
-                    .fontColor('#666666')
-                    .margin({ bottom: 4 })
-                  
-                  Row() {
-                    // 圆形进度条（简化表示）
-                    Stack() {
-                      Circle()
-                        .width(50)
-                        .height(50)
-                        .fill('#EEEEEE')
-                        .strokeWidth(5)
-                        .stroke('#03A9F4')
-                      
-                      Text('0')
-                        .fontSize(16)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#333333')
-                    }
-                  }
-                }
-                .width('33.3%')
-                .alignItems(HorizontalAlign.Center)
-                
-                Column() {
-                  Text('计划总数')
-                    .fontSize(12)
-                    .fontColor('#666666')
-                    .margin({ bottom: 4 })
-                  
-                  Row() {
-                    Text('1980')
-                      .fontSize(24)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#333333')
-                    Text('分钟')
-                      .fontSize(12)
-                      .fontColor('#666666')
-                      .alignSelf(ItemAlign.End)
-                      .margin({ left: 4, bottom: 4 })
-                  }
-                }
-                .width('33.3%')
-                .alignItems(HorizontalAlign.Center)
-              }
-              .width('100%')
-              .padding({ left: 10, right: 10 })
-              
-              // 底部信息行
-              Row() {
-                Text('📅')
-                  .fontSize(20)
-                  .fontColor('#666666')
-                Text('总共坚持天数')
-                  .fontSize(14)
-                  .fontColor('#666666')
-                  .margin({ left: 8 })
-                
-                Blank()
-                
-                Text('0 天')
-                  .fontSize(14)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#333333')
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-              
-              Row() {
-                Text('🔄')
-                  .fontSize(20)
-                  .fontColor('#666666')
-                Text('连续坚持天数')
-                  .fontSize(14)
-                  .fontColor('#666666')
-                  .margin({ left: 8 })
-                
-                Blank()
-                
-                Text('0 天')
-                  .fontSize(14)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#333333')
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-              
-              Row() {
-                Text('📝')
-                  .fontSize(20)
-                  .fontColor('#666666')
-                Text('创建日期')
-                  .fontSize(14)
-                  .fontColor('#666666')
-                  .margin({ left: 8 })
-                
-                Blank()
-                
-                Text('2025年05月13日')
-                  .fontSize(14)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#333333')
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 12, bottom: 24 })
-            }
-            .width('100%')
-            .backgroundColor('#F5F5F5')
-            .margin({ top: 16 })
-          }
-          .width('100%')
-          .backgroundColor('#FFFFFF')
-          .borderRadius({ topLeft: 16, topRight: 16 })
-        }
-        .width('100%')
-        .height('90%')
-        .position({ x: 0, y: '10%' })
-        .backgroundColor('rgba(0, 0, 0, 0.5)')
-        .onClick(() => {
-          this.isOperationMenuShow = false;
-        })
-      }
-    }
-    .width('100%')
-    .height('100%')
   }
-}
+  }
+
+// // Minimal TodoItem class is already defined above
+// // class TodoItem { ... }
+
+// // Note: System and Permission methods (getAppAbilityContext, etc.) are part of the Index struct.
+// // Interfaces are defined at the top of the file.
