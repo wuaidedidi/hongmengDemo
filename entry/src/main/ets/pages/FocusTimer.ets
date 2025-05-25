@@ -33,37 +33,70 @@ struct MusicSelectionDialog {
   @State selectedMusic: string = '';
   controller: CustomDialogController;
   musicOptions: string[] = [];
-  onSelectMusic: (music: string) => void = () => {
-  };
+  onSelectMusic: (music: string) => void = () => {};
 
   build() {
-    Column() {
-      Text('选择背景音乐').fontSize(20).fontWeight(FontWeight.Bold).margin({ top: 10, bottom: 10 })
-      List() {
-        ForEach(this.musicOptions, (music: string) => {
-          ListItem() {
-            Row() {
-              Text(music).fontSize(16).fontColor('#333333')
-              if (music === this.selectedMusic) {
-                Text('✓').fontSize(16).fontColor('#8A2BE2').margin({ left: 8 })
-              }
-            }
-            .width('100%')
-            .height(48)
-            .padding({ left: 16, right: 16 })
-            .backgroundColor(music === this.selectedMusic ? '#F0E6FF' : '#FFFFFF')
-            .onClick(() => {
-              this.onSelectMusic(music);
-              this.controller.close();
-            })
-          }
-        })
-      }.width('90%').height(200).margin({ bottom: 10 })
+    Column({ space: 0 }) {
+      // 顶部音乐图标
+      Column() {
+        Text('🎶')
+          .fontSize(48)
+          .margin({ top: 18, bottom: 6 })
+        Text('选择背景音乐')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#333')
+          .margin({ bottom: 10 })
+      }
+      .align(Alignment.Center)
 
-      Button('取消').onClick(() => {
-        this.controller.close();
-      }).margin({ top: 10, bottom: 10 })
-    }.width('80%').padding(20).backgroundColor(Color.White).borderRadius(15)
+      // 音乐选项卡片
+      Column({ space: 10 }) {
+        ForEach(this.musicOptions, (music: string) => {
+          Row() {
+            Text(music)
+              .fontSize(17)
+              .fontColor(music === this.selectedMusic ? '#8A2BE2' : '#333')
+              .fontWeight(music === this.selectedMusic ? FontWeight.Bold : FontWeight.Normal)
+            Blank()
+            if (music === this.selectedMusic) {
+              Text('✔').fontSize(20).fontColor('#8A2BE2')
+            }
+          }
+          .padding({ left: 20, right: 20, top: 14, bottom: 14 })
+          .backgroundColor(music === this.selectedMusic ? '#F3EFFF' : '#FFF')
+          .borderRadius(16)
+          .shadow(music === this.selectedMusic ? { radius: 8, color: '#8A2BE220', offsetX: 0, offsetY: 2 } : undefined)
+          .onClick(() => {
+            this.onSelectMusic(music);
+            this.controller.close();
+          })
+          .margin({ left: 8, right: 8 })
+        })
+      }
+      .width('100%')
+      .margin({ top: 8, bottom: 8 })
+
+      // 底部操作区
+      Row() {
+        Button('取消')
+          .width('100%')
+          .height(44)
+          .fontSize(17)
+          .fontColor('#8A2BE2')
+          .backgroundColor('#F5F5F5')
+          .borderRadius(22)
+          .onClick(() => {
+            this.controller.close();
+          })
+      }
+      .padding({ left: 20, right: 20, top: 10, bottom: 10 })
+    }
+    .width('92%')
+    .backgroundColor('#FFF')
+    .borderRadius(22)
+    .shadow({ radius: 16, color: 'rgba(138,43,226,0.10)', offsetX: 0, offsetY: 4 })
+    .padding({ bottom: 8 })
   }
 }
 

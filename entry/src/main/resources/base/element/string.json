@@ -14,11 +14,31 @@
     },
     {
       "name": "background_running_reason",
-      "value": "需要在后台运行以保持计时器正常工作，避免被系统休眠导致计时异常"
+      "value": "Required to keep timer and reminders working in background"
     },
     {
       "name": "start_abilities_reason",
       "value": "Required to open system settings page"
+    },
+    {
+      "name": "calendar_permission",
+      "value": "Required to read calendar for syncing todos"
+    },
+    {
+      "name": "notification_reason",
+      "value": "Required to send notifications for task completion"
+    },
+    {
+      "name": "internet_reason",
+      "value": "Required for data synchronization"
+    },
+    {
+      "name": "float_window_reason",
+      "value": "Required to show floating window for quick actions"
+    },
+    {
+      "name": "get_bundle_info_reason",
+      "value": "Required to get app info for basic functionality"
     }
   ]
 }
