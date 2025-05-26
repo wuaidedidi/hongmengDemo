@@ -225,6 +225,61 @@ struct PermissionDialog {
   }
 }
 
+@CustomDialog
+struct AddSubTaskDialog {
+  @State newTaskTitle: string = '';
+  @State newTaskDuration: number = 25;
+  controller: CustomDialogController;
+  onConfirm: (title: string, duration: number) => void = () => {};
+
+  build() {
+    Column() {
+      Text('添加子任务')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .margin({ top: 10, bottom: 10 })
+      
+      TextInput({ placeholder: '请输入任务标题' })
+        .width('90%')
+        .height(40)
+        .margin({ top: 16 })
+        .onChange((value: string) => {
+          this.newTaskTitle = value;
+        })
+      
+      TextInput({ placeholder: '请输入时长（分钟）' })
+        .width('90%')
+        .height(40)
+        .margin({ top: 16 })
+        .type(InputType.Number)
+        .onChange((value: string) => {
+          this.newTaskDuration = parseInt(value) || 25;
+        })
+      
+      Row() {
+        Button('取消')
+          .onClick(() => {
+            this.controller.close();
+          })
+          .margin({ right: 10 })
+        
+        Button('确定')
+          .onClick(() => {
+            if (this.newTaskTitle.trim() === '') {
+              promptAction.showToast({ message: '标题不能为空' });
+              return;
+            }
+            this.onConfirm(this.newTaskTitle, this.newTaskDuration);
+            this.controller.close();
+          })
+      }
+      .margin({ top: 20, bottom: 10 })
+    }
+    .width('80%')
+    .padding(20)
+  }
+}
+
 @Entry
 @Component
 struct TodoDetail {
@@ -252,6 +307,15 @@ struct TodoDetail {
       newCollectionTitle: $newCollectionTitle,
       onConfirm: () => {
         this.addNewCollection();
+      }
+    }),
+    autoCancel: true,
+    alignment: DialogAlignment.Center
+  });
+  private addSubTaskDialogController: CustomDialogController = new CustomDialogController({
+    builder: AddSubTaskDialog({
+      onConfirm: (title: string, duration: number) => {
+        this.addNewSubTask(title, duration);
       }
     }),
     autoCancel: true,
@@ -630,6 +694,33 @@ struct TodoDetail {
     }
   }
 
+  // 添加新子任务的方法
+  addNewSubTask(title: string, duration: number) {
+    const collection = this.todoCollections.find(c => c.id === this.currentExpandedId);
+    if (collection) {
+      const newTaskId = collection.id + '_s' + (collection.subTasks.length + 1);
+      const newTask = new ActualTodoItem(newTaskId, title, duration);
+      collection.subTasks.push(newTask);
+      
+      // 更新集合
+      const index = this.todoCollections.findIndex(c => c.id === collection.id);
+      if (index !== -1) {
+        const updatedCollection = new LocalTodoCollection(
+          collection.id,
+          collection.collectionTitle,
+          collection.subTasks,
+          collection.isExpanded
+        );
+        updatedCollection.isSequenceActive = collection.isSequenceActive;
+        updatedCollection.currentTaskIndex = collection.currentTaskIndex;
+        this.todoCollections.splice(index, 1, updatedCollection);
+        this.todoCollections = [...this.todoCollections];
+      }
+      
+      promptAction.showToast({ message: "新子任务已添加" });
+    }
+  }
+
   build() {
     Stack() {
       Column().width('100%').height('100%').backgroundColor(this.bgColor)
@@ -712,42 +803,100 @@ struct TodoDetail {
 
                 if (collection.isExpanded) {
                   Column({ space: 8 }) {
-                    ForEach(collection.subTasks, (subTask: ActualTodoItem, index: number) => {
+                    ForEach(collection.subTasks, (task: ActualTodoItem) => {
+                      Swiper() {
                         Row() {
                           Column() {
-                          Text(subTask.title)
+                            Text(task.title)
                               .fontSize(16)
                               .fontWeight(FontWeight.Medium)
-                          Text(`${subTask.durationMinutes} 分钟`)
+                            Text(`${task.durationMinutes} 分钟`)
                               .fontSize(14)
-                            .opacity(0.6)
+                              .opacity(0.6)
                               .margin({ top: 4 })
                           }
                           .layoutWeight(1)
-                        .alignItems(HorizontalAlign.Start)
+                          .alignItems(HorizontalAlign.Start)
 
-                        if (subTask.isCompleted) {
-                          Text('✓')
-                            .fontSize(20)
+                          if (task.isCompleted) {
+                            Text('✓')
+                              .fontSize(20)
                               .fontColor('#4CAF50')
-                        } else if (collection.currentTaskIndex === index && collection.isSequenceActive) {
-                          Text('⏳')
-                            .fontSize(20)
-                            .fontColor('#FFA500')
+                          } else if (collection.currentTaskIndex === collection.subTasks.indexOf(task) && collection.isSequenceActive) {
+                            Text('⏳')
+                              .fontSize(20)
+                              .fontColor('#FFA500')
+                          }
                         }
+                        .width('100%')
+                        .padding(12)
+                        .backgroundColor(task.isCompleted ? '#F5F5F5' : '#FFFFFF')
+                        .borderRadius(8)
+                        .margin({ top: collection.subTasks.indexOf(task) === 0 ? 8 : 0 })
+                        .onClick(() => {
+                          if (!task.isCompleted && !collection.isSequenceActive) {
+                            // 如果点击未完成的子任务，从该任务开始序列
+                            this.startSequenceTask(collection, collection.subTasks.indexOf(task));
+                          }
+                        })
+
+                        Row() {
+                          Button('删除')
+                            .width('100%')
+                            .height('100%')
+                            .backgroundColor('#FF3B30')
+                            .fontColor(Color.White)
+                            .onClick(() => {
+                              // 删除子任务
+                              const taskIndex = collection.subTasks.indexOf(task);
+                              if (taskIndex !== -1) {
+                                collection.subTasks.splice(taskIndex, 1);
+                                
+                                // 更新集合
+                                const index = this.todoCollections.findIndex(c => c.id === collection.id);
+                                if (index !== -1) {
+                                  const updatedCollection = new LocalTodoCollection(
+                                    collection.id,
+                                    collection.collectionTitle,
+                                    collection.subTasks,
+                                    collection.isExpanded
+                                  );
+                                  updatedCollection.isSequenceActive = collection.isSequenceActive;
+                                  updatedCollection.currentTaskIndex = collection.currentTaskIndex;
+                                  this.todoCollections.splice(index, 1, updatedCollection);
+                                  this.todoCollections = [...this.todoCollections];
+                                }
+                                
+                                promptAction.showToast({ message: "子任务已删除" });
+                              }
+                            })
+                        }
+                        .width(80)
+                        .height('100%')
+                        .backgroundColor('#FF3B30')
+                        .borderRadius(8)
                       }
+                      .index(0)
                       .width('100%')
-                      .padding(12)
-                      .backgroundColor(subTask.isCompleted ? '#F5F5F5' : '#FFFFFF')
-                      .borderRadius(8)
-                      .margin({ top: index === 0 ? 8 : 0 })
-                      .onClick(() => {
-                        if (!subTask.isCompleted && !collection.isSequenceActive) {
-                          // 如果点击未完成的子任务，从该任务开始序列
-                          this.startSequenceTask(collection, index);
-                        }
-                      })
+                      .height(80)
+                      .displayMode(SwiperDisplayMode.AutoLinear)
+                      .itemSpace(0)
+                      .indicator(false)
                     })
+
+                    // 添加新子任务的按钮
+                    Button('+ 添加子任务')
+                      .width('100%')
+                      .height(40)
+                      .fontSize(14)
+                      .fontColor('#1E90FF')
+                      .backgroundColor('#F0F8FF')
+                      .borderRadius(8)
+                      .margin({ top: 12 })
+                      .onClick(() => {
+                        this.currentExpandedId = collection.id;
+                        this.addSubTaskDialogController.open();
+                      })
                   }
                   .width('100%')
                   .padding({
