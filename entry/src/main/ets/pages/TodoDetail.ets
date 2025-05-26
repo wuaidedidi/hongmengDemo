@@ -730,7 +730,7 @@ struct TodoDetail {
                           Text('✓')
                             .fontSize(20)
                               .fontColor('#4CAF50')
-                        } else if (collection.currentTaskIndex === index) {
+                        } else if (collection.currentTaskIndex === index && collection.isSequenceActive) {
                           Text('⏳')
                             .fontSize(20)
                             .fontColor('#FFA500')

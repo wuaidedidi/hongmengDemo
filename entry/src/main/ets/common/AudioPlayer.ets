@@ -111,32 +111,24 @@ export class AudioPlayer {
       return;
     }
 
-    // 如果当前已经在播放该音乐，则不处理
-    if (this.playingId === musicId && this.player && this.isPlaying()) {
-      return;
-    }
+    // 先停止当前播放（无论是否同一首）
+    this.stop();
 
     try {
       if (!this.player) {
         // 初始化播放器并等待一段时间
         this.initPlayer();
-        
         // 使用超时等待播放器初始化
         const delay = (ms: number): Promise<void> => {
           return new Promise<void>((resolve) => {
             setTimeout(resolve, ms);
           });
         };
-        
         await delay(500);
-        
         if (!this.player) {
           throw new Error('播放器初始化失败');
         }
       }
-
-      // 先停止当前播放
-      this.stop();
 
       // 获取对应的音频文件路径
       const soundPath = this.musicMap[musicId];

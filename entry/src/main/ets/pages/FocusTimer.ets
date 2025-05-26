@@ -18,7 +18,7 @@ interface FocusTimerParams {
 // 定义FocusTimer返回给调用页面的参数接口
 interface FocusCompletionParams {
   action?: 'focusCompleted';
-  sequenceAction?: 'taskCompleted' | 'sequenceAborted';
+  sequenceAction?: 'taskCompleted' | 'sequenceAborted' | 'sequenceCompleted';
   collectionId?: string;
   subTaskId?: string;
   todoId?: string | number;
@@ -127,9 +127,9 @@ struct FocusTimer {
     alignment: DialogAlignment.Center
   });
   @State private isSequence: boolean = false;
-  @State private collectionId: string | null = null;
-  @State private subTaskId: string | null = null;
-  @State private todoId: string | number | null = null;
+  @State private collectionId: string | undefined = undefined;
+  @State private subTaskId: string | undefined = undefined;
+  @State private todoId: string | number | undefined = undefined;
   @State private currentSubTaskIndex: number = -1;
   @State private totalSubTasksInCollection: number = 0;
   private initialTotalSeconds: number = 25 * 60; // 用于进度条的总时长
@@ -145,9 +145,9 @@ struct FocusTimer {
         params.taskTitle !== undefined ? String(params.taskTitle) : (params.title ? String(params.title) : '专注任务');
 
       this.isSequence = params.isSequence === true;
-      this.collectionId = params.collectionId ? String(params.collectionId) : null;
-      this.subTaskId = params.subTaskId ? String(params.subTaskId) : null;
-      this.todoId = params.todoId ? params.todoId : null;
+      this.collectionId = params.collectionId ? String(params.collectionId) : undefined;
+      this.subTaskId = params.subTaskId ? String(params.subTaskId) : undefined;
+      this.todoId = params.todoId ? params.todoId : undefined;
       this.currentSubTaskIndex = params.currentSubTaskIndex !== undefined ? Number(params.currentSubTaskIndex) : -1;
       this.totalSubTasksInCollection =
         params.totalSubTasksInCollection !== undefined ? Number(params.totalSubTasksInCollection) : 0;
@@ -162,7 +162,7 @@ struct FocusTimer {
 
     this.startTimer();
     if (this.selectedMusic !== '无声') {
-      this.playSelectedMusic(this.selectedMusic, false);
+      this.playSelectedMusic(this.selectedMusic);
     }
   }
 
@@ -195,10 +195,17 @@ struct FocusTimer {
           this.timerId = -1;
           // 计时结束时停止音乐
           audioPlayer.stop();
-          promptAction.showToast({
-            message: '专注时间结束！',
-            duration: 3000
-          });
+          
+          if (this.isSequence) {
+            // 如果是序列模式，自动启动下一个任务
+            this.startNextTask();
+          } else {
+            // 非序列模式，显示普通完成提示
+            promptAction.showToast({
+              message: '专注时间结束！',
+              duration: 3000
+            });
+          }
         }
       }
     }, 1000);
@@ -207,21 +214,62 @@ struct FocusTimer {
   // 播放选择的音乐
   playSelectedMusic(music: string) {
     this.selectedMusic = music;
-    
     try {
-      // 播放选中的音乐
-      audioPlayer.play(music);
-      
-      promptAction.showToast({
-        message: music === '无声' ? '已切换到静音模式' : `正在播放: ${music}`,
-        duration: 2000
-      });
+      if (music === '无声') {
+        audioPlayer.stop();
+        promptAction.showToast({
+          message: '已切换到静音模式',
+          duration: 2000
+        });
+      } else {
+        audioPlayer.play(music); // 直接传音乐名
+        promptAction.showToast({
+          message: `正在播放: ${music}`,
+          duration: 2000
+        });
+      }
     } catch (error) {
       console.error(`播放音乐失败: ${error}`);
       promptAction.showToast({
         message: '播放音乐失败，请重试',
         duration: 2000
       });
+    }
+  }
+  
+  // 修改startNextTask方法
+  private startNextTask() {
+    if (this.isSequence && this.currentSubTaskIndex >= 0 && this.totalSubTasksInCollection > 0) {
+      const nextIndex = this.currentSubTaskIndex + 1;
+      if (nextIndex < this.totalSubTasksInCollection) {
+        // 构建下一个任务的参数
+        const nextTaskParams: FocusTimerParams = {
+          isSequence: true,
+          collectionId: this.collectionId,
+          currentSubTaskIndex: nextIndex,
+          totalSubTasksInCollection: this.totalSubTasksInCollection
+        };
+        
+        // 使用router.push跳转到下一个任务
+        router.pushUrl({
+          url: 'pages/FocusTimer',
+          params: nextTaskParams
+        });
+      } else {
+        // 所有任务完成，显示恭喜提示
+        promptAction.showToast({
+          message: '恭喜！所有待办事项已完成！',
+          duration: 3000
+        });
+        // 返回主页面
+        router.back({
+          url: 'pages/Index',
+          params: {
+            action: 'focusCompleted',
+            sequenceAction: 'sequenceCompleted'
+          }
+        });
+      }
     }
   }
   
@@ -246,6 +294,14 @@ struct FocusTimer {
             .margin({ left: 16 })
           
           Blank()
+          
+          if (this.isSequence) {
+            Text(`序列任务 ${this.currentSubTaskIndex + 1}/${this.totalSubTasksInCollection}`)
+              .fontSize(16)
+              .fontColor('#FFFFFF')
+              .opacity(0.8)
+              .margin({ right: 16 })
+          }
           
           Row({ space: 4 }) {
             Text('📷')
@@ -395,9 +451,45 @@ struct FocusTimer {
           .height(50)
           .backgroundColor('rgba(255, 255, 255, 0.2)')
           .onClick(() => {
-            // 停止音乐
+            // 提前完成计时
             audioPlayer.stop();
-            router.back();
+            
+            if (this.isSequence) {
+              // 如果是序列模式，自动启动下一个任务
+              this.startNextTask();
+            } else {
+              // 非序列模式，显示普通完成提示
+              promptAction.showToast({
+                message: '专注已提前完成！',
+                duration: 2000
+              });
+              
+              // 构建返回参数
+              const params: FocusCompletionParams = {
+                action: 'focusCompleted',
+                sequenceAction: 'taskCompleted'
+              };
+              
+              // 添加可选参数
+              if (this.collectionId) {
+                params.collectionId = this.collectionId;
+              }
+              if (this.subTaskId) {
+                params.subTaskId = this.subTaskId;
+              }
+              if (this.todoId) {
+                params.todoId = this.todoId;
+              }
+              if (this.currentSubTaskIndex >= 0) {
+                params.currentSubTaskIndex = this.currentSubTaskIndex;
+              }
+              
+              // 返回上一页并传递参数
+              router.back({
+                url: 'pages/Index',
+                params: params
+              });
+            }
           })
         }
         .width('100%')
