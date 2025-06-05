@@ -1,5 +1,6 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
+import { ThemeService, ThemeConfig } from '../services/ThemeService';
 
 interface TabItem {
   icon: string;
@@ -11,10 +12,26 @@ interface TabItem {
 export struct TabBar {
   @Prop currentIndex: number = 0;
   @Prop isLocked?: boolean = false;  // 添加锁机状态属性
+  @State currentTheme: ThemeConfig = {
+    id: 'light',
+    name: '浅色主题',
+    primaryColor: '#007AFF',
+    backgroundColor: '#FFFFFF',
+    textColor: '#000000',
+    cardBackgroundColor: '#F8F8F8',
+    borderColor: '#E0E0E0',
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    errorColor: '#FF3B30'
+  };
+
+  private themeService: ThemeService = ThemeService.getInstance();
+  private themeChangeListener = (theme: ThemeConfig) => {
+    this.currentTheme = theme;
+  };
 
   private tabs: TabItem[] = [
     { icon: '📅', text: '待办', path: 'pages/Index' },
-    { icon: '📝', text: '待办事项', path: 'pages/TodoDetail' },
+    { icon: '📝', text: '待办管理', path: 'pages/TodoPage' },
     { icon: '🔒', text: '锁机', path: 'pages/LockPage' },
     { icon: '📊', text: '统计数据', path: 'pages/StatisticsPage' },
     { icon: '👤', text: '我的', path: 'pages/Profile' }
@@ -25,11 +42,13 @@ export struct TabBar {
     Column() {
       Text(icon)
         .fontSize(24)
-        .fontColor(this.currentIndex === index ? '#8A2BE2' : '#666666')
+        .fontColor(this.currentIndex === index ? this.currentTheme.primaryColor : this.currentTheme.textColor)
+        .opacity(this.currentIndex === index ? 1.0 : 0.6)
       Text(text)
         .fontSize(12)
         .margin({ top: 4 })
-        .fontColor(this.currentIndex === index ? '#8A2BE2' : '#666666')
+        .fontColor(this.currentIndex === index ? this.currentTheme.primaryColor : this.currentTheme.textColor)
+        .opacity(this.currentIndex === index ? 1.0 : 0.6)
     }
     .width('20%')
     .height(56)
@@ -46,7 +65,7 @@ export struct TabBar {
           return;
         }
         console.info(`正在跳转到: ${this.tabs[index].path}`);
-        router.pushUrl({
+        router.replaceUrl({
           url: this.tabs[index].path,
           params: {}
         }).then(() => {
@@ -62,6 +81,22 @@ export struct TabBar {
     })
   }
 
+  async aboutToAppear() {
+    // 注册主题变化监听器
+    this.themeService.addThemeChangeListener(this.themeChangeListener);
+    // 加载当前主题
+    try {
+      this.currentTheme = await this.themeService.getCurrentTheme();
+    } catch (error) {
+      console.error('TabBar加载主题失败:', error);
+    }
+  }
+
+  aboutToDisappear() {
+    // 注销主题变化监听器
+    this.themeService.removeThemeChangeListener(this.themeChangeListener);
+  }
+
   build() {
     Row() {
       ForEach(this.tabs, (item: TabItem, index: number) => {
@@ -70,10 +105,10 @@ export struct TabBar {
     }
     .width('100%')
     .height(56)
-    .backgroundColor(Color.White)
+    .backgroundColor(this.currentTheme.cardBackgroundColor)
     .justifyContent(FlexAlign.SpaceEvenly)
-    .border({ width: { top: 0.5 }, color: '#E0E0E0' })
-    .shadow({ radius: 4, color: 'rgba(0,0,0,0.1)', offsetY: -2 })
+    .border({ width: { top: 0.5 }, color: this.currentTheme.borderColor })
+    .shadow({ radius: 4, color: this.currentTheme.shadowColor, offsetY: -2 })
     .zIndex(1)
   }
-} 
+}

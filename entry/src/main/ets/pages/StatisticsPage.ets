@@ -1,6 +1,8 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import { TabBar } from '../components/TabBar';
+import { ApiService, StatisticsResponse } from '../services/ApiService';
+import { ThemeService, ThemeConfig } from '../services/ThemeService';
 
 @Entry
 @Component
@@ -10,9 +12,76 @@ struct StatisticsPage {
   @State totalFocusCount: number = 0;
   @State continuousDays: number = 0;
   @State totalDays: number = 0;
+  @State todayFocusTime: number = 0;
+  @State weeklyFocusTime: number = 0;
+  @State monthlyFocusTime: number = 0;
+  @State currentStreak: number = 0;
   @State weeklyData: number[] = [120, 180, 90, 150, 200, 160, 140];
   @State monthlyData: number[] = Array(30).fill(0).map(() => Math.floor(Math.random() * 200));
   @State dailyData: number[] = Array(24).fill(0).map(() => Math.floor(Math.random() * 60));
+  @State isLoading: boolean = false;
+  @State currentTheme: ThemeConfig = {
+    id: 'light',
+    name: '浅色主题',
+    primaryColor: '#007AFF',
+    backgroundColor: '#F2F2F7',
+    textColor: '#000000',
+    cardBackgroundColor: '#FFFFFF',
+    borderColor: '#E5E5EA',
+    shadowColor: '#00000010',
+    errorColor: '#FF3B30'
+  };
+  private apiService = ApiService.getInstance();
+  private themeService = ThemeService.getInstance();
+
+  private themeChangeListener = (theme: ThemeConfig) => {
+    this.currentTheme = theme;
+  };
+
+  async aboutToAppear() {
+    this.themeService.addThemeChangeListener(this.themeChangeListener);
+    this.currentTheme = await this.themeService.getCurrentTheme();
+    await this.loadStatistics();
+  }
+
+  aboutToDisappear() {
+    this.themeService.removeThemeChangeListener(this.themeChangeListener);
+  }
+
+  async loadStatistics() {
+    try {
+      this.isLoading = true;
+      console.info('开始加载统计数据...');
+      const statistics = await this.apiService.getStatistics();
+      
+      console.info('收到的统计数据原始数据:', JSON.stringify(statistics));
+      console.info('totalFocusTime 原始值:', statistics.totalFocusTime, '类型:', typeof statistics.totalFocusTime);
+      console.info('totalFocusCount 原始值:', statistics.totalFocusCount, '类型:', typeof statistics.totalFocusCount);
+      console.info('continuousDays 原始值:', statistics.continuousDays, '类型:', typeof statistics.continuousDays);
+      
+      this.totalFocusTime = Number(statistics.totalFocusTime) || 0;
+      this.totalFocusCount = Number(statistics.totalFocusCount) || 0;
+      this.continuousDays = Number(statistics.continuousDays) || 0;
+      this.totalDays = Number(statistics.totalDays) || 0;
+      this.todayFocusTime = Number(statistics.todayFocusTime) || 0;
+      this.weeklyFocusTime = Number(statistics.weeklyFocusTime) || 0;
+      this.monthlyFocusTime = Number(statistics.monthlyFocusTime) || 0;
+      this.currentStreak = Number(statistics.currentStreak) || 0;
+      
+      console.info('设置后的前端数据:');
+      console.info('- totalFocusTime:', this.totalFocusTime);
+      console.info('- totalFocusCount:', this.totalFocusCount);
+      console.info('- continuousDays:', this.continuousDays);
+      console.info('- formatTime结果:', this.formatTime(this.totalFocusTime));
+      
+      console.info('统计数据加载成功');
+    } catch (error) {
+      console.error('加载统计数据失败:', error);
+      promptAction.showToast({ message: '加载统计数据失败，请重试' });
+    } finally {
+      this.isLoading = false;
+    }
+  }
 
   // 计算周数据百分比
   calculateWeeklyPercentages(): number[] {
@@ -32,21 +101,13 @@ struct StatisticsPage {
     return this.dailyData.map(value => (value / total) * 100);
   }
 
-  aboutToAppear() {
-    this.loadStatisticsData();
-  }
-
-  loadStatisticsData() {
-    this.totalFocusTime = 3600;
-    this.totalFocusCount = 24;
-    this.continuousDays = 7;
-    this.totalDays = 30;
-  }
-
   formatTime(minutes: number): string {
+    console.info(`formatTime调用: 输入=${minutes}, 类型=${typeof minutes}`);
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}小时${mins}分钟`;
+    const result = `${hours}小时${mins}分钟`;
+    console.info(`formatTime结果: ${result} (${hours}h ${mins}m)`);
+    return result;
   }
 
   build() {
@@ -64,19 +125,31 @@ struct StatisticsPage {
         Text('专注统计')
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#333333')
-          .margin({ left: 16 })
+          .fontColor(this.currentTheme.textColor)
+          .layoutWeight(1)
+          .textAlign(TextAlign.Center)
 
-        Blank()
-
-        Text('📊')
-          .fontSize(24)
-          .fontColor('#333333')
-          .margin({ right: 16 })
+        if (this.isLoading) {
+          LoadingProgress()
+            .width(24)
+            .height(24)
+            .margin({ right: 16 })
+            .color(this.currentTheme.primaryColor)
+        } else {
+          Text('刷新')
+            .fontSize(14)
+            .fontColor(this.currentTheme.primaryColor)
+            .margin({ right: 16 })
+            .onClick(() => {
+              this.loadStatistics();
+            })
+        }
       }
       .width('100%')
       .height(56)
-      .backgroundColor('#FFFFFF')
+      .backgroundColor(this.currentTheme.cardBackgroundColor)
+      .justifyContent(FlexAlign.SpaceBetween)
+      .alignItems(VerticalAlign.Center)
 
       // 统计卡片
       Scroll() {
@@ -84,13 +157,14 @@ struct StatisticsPage {
           // 总览数据
           Row() {
             Column() {
-              Text(this.totalFocusTime.toString())
-                .fontSize(32)
+              Text(this.formatTime(this.totalFocusTime))
+                .fontSize(24)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#8A2BE2')
-              Text('总专注时长（分钟）')
+                .fontColor(this.currentTheme.primaryColor)
+              Text('总专注时间')
                 .fontSize(14)
-                .fontColor('#666666')
+                .fontColor(this.currentTheme.textColor)
+                .opacity(0.7)
                 .margin({ top: 4 })
             }
             .layoutWeight(1)
@@ -100,10 +174,11 @@ struct StatisticsPage {
               Text(this.totalFocusCount.toString())
                 .fontSize(32)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#8A2BE2')
+                .fontColor(this.currentTheme.primaryColor)
               Text('专注次数')
                 .fontSize(14)
-                .fontColor('#666666')
+                .fontColor(this.currentTheme.textColor)
+                .opacity(0.7)
                 .margin({ top: 4 })
             }
             .layoutWeight(1)
@@ -113,10 +188,11 @@ struct StatisticsPage {
               Text(this.continuousDays.toString())
                 .fontSize(32)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#8A2BE2')
+                .fontColor(this.currentTheme.primaryColor)
               Text('连续天数')
                 .fontSize(14)
-                .fontColor('#666666')
+                .fontColor(this.currentTheme.textColor)
+                .opacity(0.7)
                 .margin({ top: 4 })
             }
             .layoutWeight(1)
@@ -124,11 +200,11 @@ struct StatisticsPage {
           }
           .width('100%')
           .padding(16)
-          .backgroundColor('#FFFFFF')
+          .backgroundColor(this.currentTheme.cardBackgroundColor)
           .borderRadius(16)
           .shadow({
             radius: 8,
-            color: 'rgba(0,0,0,0.1)',
+            color: this.currentTheme.shadowColor,
             offsetX: 0,
             offsetY: 2
           })
@@ -141,10 +217,10 @@ struct StatisticsPage {
               ForEach(['日', '周', '月'], (item: string, index: number) => {
                 Text(item)
                   .fontSize(16)
-                  .fontColor(this.currentTab === index ? '#FFFFFF' : '#8A2BE2')
+                  .fontColor(this.currentTab === index ? '#FFFFFF' : this.currentTheme.primaryColor)
                   .fontWeight(this.currentTab === index ? FontWeight.Bold : FontWeight.Normal)
                   .padding({ left: 24, right: 24, top: 12, bottom: 12 })
-                  .backgroundColor(this.currentTab === index ? '#8A2BE2' : '#F0E6FF')
+                  .backgroundColor(this.currentTab === index ? this.currentTheme.primaryColor : this.currentTheme.backgroundColor)
                   .borderRadius(24)
                   .onClick(() => {
                     this.currentTab = index;
@@ -332,7 +408,7 @@ struct StatisticsPage {
                         Text('本月')
                           .fontSize(16)
                           .fontColor('#666666')
-                        Text(this.totalFocusTime.toString())
+                        Text(this.monthlyFocusTime.toString())
                           .fontSize(24)
                           .fontWeight(FontWeight.Bold)
                           .fontColor('#8A2BE2')
@@ -461,7 +537,7 @@ struct StatisticsPage {
       }
       .width('100%')
       .layoutWeight(1)
-      .backgroundColor('#F8F8F8')
+      .backgroundColor(this.currentTheme.backgroundColor)
 
       // 底部导航栏
       TabBar({ currentIndex: 3 })
@@ -490,4 +566,4 @@ struct StatisticsPage {
     const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
     return `M ${radius} ${radius} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
   }
-} 
+}

@@ -39,6 +39,10 @@
         {
             "name": "start_abilities_reason",
             "value": "需要该权限以打开系统设置页面"
+        },
+        {
+            "name": "internet_permission_reason",
+            "value": "此应用需要网络访问权限以与后端服务器通信"
         }
     ]
 }

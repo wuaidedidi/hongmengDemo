@@ -39,6 +39,10 @@
     {
       "name": "get_bundle_info_reason",
       "value": "Required to get app info for basic functionality"
+    },
+    {
+      "name": "background_permission_reason",
+      "value": "Required to keep the app running in background for timer functionality"
     }
   ]
 }

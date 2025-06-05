@@ -1,6 +1,7 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import { TabBar } from '../components/TabBar';
+import { ThemeService, ThemeConfig } from '../services/ThemeService';
 
 @Entry
 @Component
@@ -11,9 +12,27 @@ struct LockPage {
   @State timer: number = -1;
   @State showDurationPicker: boolean = false;
   @State showUnlockConfirm: boolean = false;
+  @State currentTheme: ThemeConfig = {
+    id: 'light',
+    name: '浅色主题',
+    primaryColor: '#007AFF',
+    backgroundColor: '#F2F2F7',
+    textColor: '#000000',
+    cardBackgroundColor: '#FFFFFF',
+    borderColor: '#E5E5EA',
+    shadowColor: '#00000010',
+    errorColor: '#FF3B30'
+  };
+  private themeService = ThemeService.getInstance();
 
-  aboutToAppear() {
+  private themeChangeListener = (theme: ThemeConfig) => {
+    this.currentTheme = theme;
+  };
+
+  async aboutToAppear() {
     // 初始化页面
+    this.themeService.addThemeChangeListener(this.themeChangeListener);
+    this.currentTheme = await this.themeService.getCurrentTheme();
   }
 
   aboutToDisappear() {
@@ -22,6 +41,7 @@ struct LockPage {
       clearInterval(this.timer);
       this.timer = -1;
     }
+    this.themeService.removeThemeChangeListener(this.themeChangeListener);
   }
 
   startLock() {
@@ -76,19 +96,19 @@ struct LockPage {
           Text('锁机')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#333333')
+            .fontColor(this.currentTheme.textColor)
             .margin({ left: 16 })
 
           Blank()
 
           Text('🔒')
             .fontSize(24)
-            .fontColor('#333333')
+            .fontColor(this.currentTheme.textColor)
             .margin({ right: 16 })
         }
         .width('100%')
         .height(56)
-        .backgroundColor('#FFFFFF')
+        .backgroundColor(this.currentTheme.cardBackgroundColor)
 
         // 主要内容区域
         Column() {
@@ -97,17 +117,19 @@ struct LockPage {
               Text('锁机中...')
                 .fontSize(24)
                 .fontWeight(FontWeight.Bold)
+                .fontColor(this.currentTheme.textColor)
                 .margin({ bottom: 32 })
 
               Text(this.formatTime(this.remainingTime))
                 .fontSize(72)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#8A2BE2')
+                .fontColor(this.currentTheme.primaryColor)
                 .margin({ bottom: 48 })
 
               Text('请专注完成当前任务')
                 .fontSize(18)
-                .fontColor('#666666')
+                .fontColor(this.currentTheme.textColor)
+                .opacity(0.7)
                 .margin({ bottom: 32 })
 
               Button('解锁')
@@ -129,7 +151,7 @@ struct LockPage {
                 .height(48)
                 .fontSize(18)
                 .fontColor('#FFFFFF')
-                .backgroundColor('#8A2BE2')
+                .backgroundColor(this.currentTheme.primaryColor)
                 .borderRadius(24)
                 .margin({ bottom: 16 })
                 .onClick(() => {
@@ -142,7 +164,7 @@ struct LockPage {
                 .height(48)
                 .fontSize(18)
                 .fontColor('#FFFFFF')
-                .backgroundColor('#8A2BE2')
+                .backgroundColor(this.currentTheme.primaryColor)
                 .borderRadius(24)
                 .margin({ bottom: 16 })
                 .onClick(() => {
@@ -155,7 +177,7 @@ struct LockPage {
                 .height(48)
                 .fontSize(18)
                 .fontColor('#FFFFFF')
-                .backgroundColor('#8A2BE2')
+                .backgroundColor(this.currentTheme.primaryColor)
                 .borderRadius(24)
                 .onClick(() => {
                   this.selectedDuration = 120;
@@ -168,7 +190,7 @@ struct LockPage {
         }
         .width('100%')
         .layoutWeight(1)
-        .backgroundColor('#F8F8F8')
+        .backgroundColor(this.currentTheme.backgroundColor)
         .padding(16)
 
         // 底部导航栏
@@ -185,11 +207,13 @@ struct LockPage {
           Text('确认解锁？')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
+            .fontColor(this.currentTheme.textColor)
             .margin({ bottom: 16 })
 
           Text('提前解锁将中断锁机')
             .fontSize(16)
-            .fontColor('#666666')
+            .fontColor(this.currentTheme.textColor)
+            .opacity(0.7)
             .margin({ bottom: 24 })
 
           Row() {
@@ -197,8 +221,8 @@ struct LockPage {
               .width(120)
               .height(40)
               .fontSize(16)
-              .backgroundColor('#F5F5F5')
-              .fontColor('#333333')
+              .backgroundColor(this.currentTheme.backgroundColor)
+              .fontColor(this.currentTheme.textColor)
               .margin({ right: 16 })
               .onClick(() => {
                 this.showUnlockConfirm = false;
@@ -218,7 +242,7 @@ struct LockPage {
         }
         .width('80%')
         .padding(24)
-        .backgroundColor(Color.White)
+        .backgroundColor(this.currentTheme.cardBackgroundColor)
         .borderRadius(16)
         .position({ x: '10%', y: '40%' })
       }
@@ -226,4 +250,4 @@ struct LockPage {
     .width('100%')
     .height('100%')
   }
-} 
+}

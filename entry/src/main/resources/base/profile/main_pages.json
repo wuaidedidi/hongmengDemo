@@ -3,11 +3,13 @@
     "pages/Index",
     "pages/Second",
     "pages/TodoDetail",
+    "pages/TodoPage",
     "pages/LockPage",
     "pages/StatisticsPage",
     "pages/Profile",
     "pages/FocusTimer",
     "pages/TodoOperation",
-    "pages/BackgroundSettingsPage"
+    "pages/BackgroundSettingsPage",
+    "pages/ThemeSettingsPage"
   ]
 }

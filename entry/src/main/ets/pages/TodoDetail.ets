@@ -7,6 +7,7 @@ import type Want from '@ohos.app.ability.Want';
 import { TodoCollection, TodoItem, TodoStatus } from '../model/TodoTypes';
 import { mockCollections } from '../model/MockData';
 import { TabBar } from '../components/TabBar';
+import { ThemeService, ThemeConfig } from '../services/ThemeService';
 
 // FocusTimer页面路由参数定义 (根据TodoDetail的需求调整)
 interface FocusTimerRouterParams {
@@ -288,6 +289,17 @@ struct TodoDetail {
   @State currentIndex: number = 1;
   @State bgColor: string = 'rgba(173, 216, 230, 0.15)';
   @State showCongratulationsDialog: boolean = false;
+  @State currentTheme: ThemeConfig = {
+    id: 'light',
+    name: '浅色主题',
+    primaryColor: '#007AFF',
+    backgroundColor: '#FFFFFF',
+    textColor: '#000000',
+    cardBackgroundColor: '#F8F8F8',
+    borderColor: '#E0E0E0',
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    errorColor: '#FF3B30'
+  };
   @State todoCollections: LocalTodoCollection[] = [
     new LocalTodoCollection("default_coll1", "学习鸿蒙开发", [
       new ActualTodoItem("s1_1", "阅读官方文档第一章", 25),
@@ -321,11 +333,22 @@ struct TodoDetail {
     autoCancel: true,
     alignment: DialogAlignment.Center
   });
+  private themeService = ThemeService.getInstance();
 
-  aboutToAppear() {
+  private themeChangeListener = (theme: ThemeConfig) => {
+    this.currentTheme = theme;
+  };
+
+  async aboutToAppear() {
     console.info('TodoDetail aboutToAppear. CurrentIndex: ' + this.currentIndex);
     this.currentIndex = 1;
+    this.themeService.addThemeChangeListener(this.themeChangeListener);
+    this.currentTheme = await this.themeService.getCurrentTheme();
     this.processRouteParams(); // 处理首次进入时可能存在的路由参数
+  }
+
+  aboutToDisappear() {
+    this.themeService.removeThemeChangeListener(this.themeChangeListener);
   }
 
   onPageShow() {
@@ -414,7 +437,7 @@ struct TodoDetail {
     updatedCollection.isSequenceActive = collection.isSequenceActive;
     updatedCollection.currentTaskIndex = collection.currentTaskIndex;
     this.todoCollections.splice(collectionIndex, 1, updatedCollection);
-    this.todoCollections = [...this.todoCollections];
+    this.todoCollections = Array.from(this.todoCollections);
   }
 
   addNewCollection() {
@@ -474,7 +497,7 @@ struct TodoDetail {
         updatedCollection.currentTaskIndex = collection.currentTaskIndex;
         this.todoCollections.splice(colIndex, 1, updatedCollection);
       }
-      this.todoCollections = [...this.todoCollections];
+      this.todoCollections = Array.from(this.todoCollections);
       return;
     }
 
@@ -494,7 +517,7 @@ struct TodoDetail {
       updatedCollection.currentTaskIndex = collection.currentTaskIndex;
       this.todoCollections.splice(colIdx, 1, updatedCollection);
     }
-    this.todoCollections = [...this.todoCollections];
+    this.todoCollections = Array.from(this.todoCollections);
 
     const params: FocusTimerRouterParams = {
       title: subTask.title,
@@ -525,7 +548,7 @@ struct TodoDetail {
           updatedCollection.currentTaskIndex = collection.currentTaskIndex;
           this.todoCollections.splice(cIdx, 1, updatedCollection);
         }
-        this.todoCollections = [...this.todoCollections];
+        this.todoCollections = Array.from(this.todoCollections);
       });
   }
 
@@ -546,7 +569,7 @@ struct TodoDetail {
 
     // 更新集合
     this.todoCollections.splice(index, 1, updatedCollection);
-    this.todoCollections = [...this.todoCollections];
+    this.todoCollections = Array.from(this.todoCollections);
   }
 
   @Builder
@@ -714,7 +737,7 @@ struct TodoDetail {
         updatedCollection.isSequenceActive = collection.isSequenceActive;
         updatedCollection.currentTaskIndex = collection.currentTaskIndex;
         this.todoCollections.splice(index, 1, updatedCollection);
-        this.todoCollections = [...this.todoCollections];
+        this.todoCollections = Array.from(this.todoCollections);
       }
       
       promptAction.showToast({ message: "新子任务已添加" });
@@ -723,34 +746,34 @@ struct TodoDetail {
 
   build() {
     Stack() {
-      Column().width('100%').height('100%').backgroundColor(this.bgColor)
+      Column().width('100%').height('100%').backgroundColor(this.currentTheme.backgroundColor)
         Column() {
           Row() {
             Text('待办事项')
-            .fontSize(22).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
+            .fontSize(22).fontWeight(FontWeight.Bold).fontColor(Color.White)
             Blank()
           Row({ space: 16 }) {
             Row() {
-              Text('必开').fontSize(14).fontColor('#FFFFFF')
-              Text('权限').fontSize(14).fontColor('#FFFFFF')
+              Text('必开').fontSize(14).fontColor(Color.White)
+              Text('权限').fontSize(14).fontColor(Color.White)
             }
             .backgroundColor('rgba(255, 255, 255, 0.2)')
             .borderRadius(12).padding({ left: 8, right: 8, top: 4, bottom: 4 })
             .margin({ right: 4 })
             .onClick(() => { this.startSystemSettingsGuidanceFlow(); })
-            Text('+').fontSize(24).fontColor('#FFFFFF')
+            Text('+').fontSize(24).fontColor(Color.White)
               .onClick(() => {
                 this.newCollectionTitle = '';
                 this.addCollectionDialogController.open();
               })
-            Text('≡').fontSize(24).fontColor('#FFFFFF')
+            Text('≡').fontSize(24).fontColor(Color.White)
               .onClick(() => {
                 promptAction.showToast({ message: "更多菜单待实现" });
               })
           }
         }
         .width('100%').height(50).padding({ left: 16, right: 16 })
-        .linearGradient({ angle: 90, colors: [['#6A5ACD', 0.0], ['#1E90FF', 1.0]] })
+        .backgroundColor(this.currentTheme.primaryColor)
 
         Scroll() {
           Column({ space: 12 }) {
@@ -760,7 +783,7 @@ struct TodoDetail {
                   Text(collection.collectionTitle)
                       .fontSize(18)
                       .fontWeight(FontWeight.Bold)
-                    .fontColor(collection.isSequenceActive ? '#FFA500' : '#333333')
+                    .fontColor(collection.isSequenceActive ? '#FFA500' : this.currentTheme.textColor)
                     .layoutWeight(1)
                     .onClick(() => {
                       this.toggleExpand(collection);
@@ -776,7 +799,8 @@ struct TodoDetail {
                       this.toggleExpand(collection);
                     })
 
-                  Button(collection.isSequenceActive ? '序列进行中...' : '开始序列')
+                  Button(collection.isSequenceActive ? '序列进行中...' : 
+                    (collection.subTasks.every(st => st.isCompleted) ? '重新开始序列' : '开始序列'))
                     .fontSize(14)
                     .fontColor(Color.White)
                     .backgroundColor(collection.isSequenceActive ? '#FFA500' : '#1E90FF')
@@ -784,9 +808,26 @@ struct TodoDetail {
                     .height(32)
                     .padding({ left: 8, right: 8 })
                     .margin({ left: 10 })
-                    .enabled(!collection.isSequenceActive &&
-                    collection.subTasks.some(st => !st.isCompleted))
+                    .enabled(!collection.isSequenceActive)
                     .onClick(() => {
+                      // 如果所有任务都已完成，重置所有任务状态
+                      if (collection.subTasks.every(st => st.isCompleted)) {
+                        collection.subTasks.forEach(st => st.isCompleted = false);
+                        // 更新UI
+                        const colIndex = this.todoCollections.findIndex(c => c.id === collection.id);
+                        if (colIndex !== -1) {
+                          const updatedCollection = new LocalTodoCollection(
+                            collection.id, 
+                            collection.collectionTitle, 
+                            collection.subTasks,
+                            collection.isExpanded
+                          );
+                          updatedCollection.isSequenceActive = collection.isSequenceActive;
+                          updatedCollection.currentTaskIndex = collection.currentTaskIndex;
+                          this.todoCollections.splice(colIndex, 1, updatedCollection);
+                          this.todoCollections = Array.from(this.todoCollections);
+                        }
+                      }
                       this.startSequenceTask(collection, 0);
                     })
                     .visibility(collection.subTasks.length > 0 ? Visibility.Visible : Visibility.Hidden)
@@ -798,7 +839,7 @@ struct TodoDetail {
                   left: 10,
                   right: 10
                 })
-                .backgroundColor(collection.isExpanded ? '#F0F8FF' : Color.White)
+                .backgroundColor(collection.isExpanded ? this.currentTheme.cardBackgroundColor : this.currentTheme.cardBackgroundColor)
                 .borderRadius(8)
 
                 if (collection.isExpanded) {
@@ -810,8 +851,10 @@ struct TodoDetail {
                             Text(task.title)
                               .fontSize(16)
                               .fontWeight(FontWeight.Medium)
+                              .fontColor(this.currentTheme.textColor)
                             Text(`${task.durationMinutes} 分钟`)
                               .fontSize(14)
+                              .fontColor(this.currentTheme.textColor)
                               .opacity(0.6)
                               .margin({ top: 4 })
                           }
@@ -830,7 +873,7 @@ struct TodoDetail {
                         }
                         .width('100%')
                         .padding(12)
-                        .backgroundColor(task.isCompleted ? '#F5F5F5' : '#FFFFFF')
+                        .backgroundColor(task.isCompleted ? this.currentTheme.borderColor : this.currentTheme.cardBackgroundColor)
                         .borderRadius(8)
                         .margin({ top: collection.subTasks.indexOf(task) === 0 ? 8 : 0 })
                         .onClick(() => {
@@ -844,7 +887,7 @@ struct TodoDetail {
                           Button('删除')
                             .width('100%')
                             .height('100%')
-                            .backgroundColor('#FF3B30')
+                            .backgroundColor(this.currentTheme.errorColor)
                             .fontColor(Color.White)
                             .onClick(() => {
                               // 删除子任务
@@ -864,7 +907,7 @@ struct TodoDetail {
                                   updatedCollection.isSequenceActive = collection.isSequenceActive;
                                   updatedCollection.currentTaskIndex = collection.currentTaskIndex;
                                   this.todoCollections.splice(index, 1, updatedCollection);
-                                  this.todoCollections = [...this.todoCollections];
+                                  this.todoCollections = Array.from(this.todoCollections);
                                 }
                                 
                                 promptAction.showToast({ message: "子任务已删除" });
@@ -873,13 +916,13 @@ struct TodoDetail {
                         }
                         .width(80)
                         .height('100%')
-                        .backgroundColor('#FF3B30')
+                        .backgroundColor(this.currentTheme.errorColor)
                         .borderRadius(8)
                       }
                       .index(0)
                       .width('100%')
                       .height(80)
-                      .displayMode(SwiperDisplayMode.AutoLinear)
+                      .displayMode(SwiperDisplayMode.STRETCH)
                       .itemSpace(0)
                       .indicator(false)
                     })
@@ -889,8 +932,8 @@ struct TodoDetail {
                       .width('100%')
                       .height(40)
                       .fontSize(14)
-                      .fontColor('#1E90FF')
-                      .backgroundColor('#F0F8FF')
+                      .fontColor(this.currentTheme.primaryColor)
+                      .backgroundColor(this.currentTheme.cardBackgroundColor)
                       .borderRadius(8)
                       .margin({ top: 12 })
                       .onClick(() => {
@@ -905,7 +948,7 @@ struct TodoDetail {
                     bottom: 8,
                     top: 8
                   })
-                  .backgroundColor('rgba(0,0,0,0.02)')
+                  .backgroundColor(this.currentTheme.borderColor)
                   .borderRadius(8)
                   .animation({
                     duration: 250,
@@ -916,7 +959,7 @@ struct TodoDetail {
                 }
               }
               .width('100%')
-              .backgroundColor(Color.White)
+              .backgroundColor(this.currentTheme.cardBackgroundColor)
               .borderRadius(10)
               .padding(12)
               .shadow({
@@ -941,14 +984,14 @@ struct TodoDetail {
           // 兼容写法：如有图片资源则用图片，否则用Emoji
           // Image($r('app.media.congrats')).width(100).height(100).margin({bottom: 15})
           Text("🎉").fontSize(60).margin({ bottom: 15 }) // 使用Emoji作为占位
-          Text('太棒了!').fontSize(22).fontWeight(FontWeight.Bold).margin({ bottom: 8 })
-          Text('你已完成当前合集中的所有任务!').fontSize(16).fontColor('#333333').margin({ bottom: 20 })
+          Text('太棒了!').fontSize(22).fontWeight(FontWeight.Bold).fontColor(this.currentTheme.textColor).margin({ bottom: 8 })
+          Text('你已完成当前合集中的所有任务!').fontSize(16).fontColor(this.currentTheme.textColor).margin({ bottom: 20 })
           Button('我知道了')
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
             .width('70%')
             .height(40)
-            .backgroundColor('#1E90FF')
+            .backgroundColor(this.currentTheme.primaryColor)
             .fontColor(Color.White)
           .onClick(() => {
               this.showCongratulationsDialog = false;
@@ -956,7 +999,7 @@ struct TodoDetail {
         }
         .width('85%')
         .padding(25)
-        .backgroundColor(Color.White)
+        .backgroundColor(this.currentTheme.cardBackgroundColor)
         .borderRadius(20)
         .shadow({
           radius: 10,
@@ -980,4 +1023,4 @@ struct TodoDetail {
     }
     .width('100%').height('100%')
   }
-} 
+}

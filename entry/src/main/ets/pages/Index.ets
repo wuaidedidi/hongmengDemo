@@ -6,6 +6,10 @@ import Want from '@ohos.app.ability.Want';
 import { TabBar } from '../components/TabBar';
 import abilityAccessCtrl from '@ohos.abilityAccessCtrl';
 import { PhxSystemActionUtil } from '../utils/PhxSystemActionUtil';
+import { ApiService, TodoItemRequest } from '../services/ApiService';
+import type { TodoItem as ApiTodoItem } from '../services/ApiService';
+import { ThemeService, ThemeConfig } from '../services/ThemeService';
+
 // TodoList 被移除，因为它与 TodoCollection 关联较多，后续按需调整
 // import { TodoList } from '../view/TodoList';
 
@@ -58,7 +62,7 @@ interface FocusTimerRouterParams {
   subTaskId?: string; // Index 页面不再处理子任务
   currentSubTaskIndex?: number; // Index 页面不再处理子任务索引
   totalSubTasksInCollection?: number; // Index 页面不再处理合集任务总数
-  todoId?: string | number; // 用于简单待办
+  todoId?: string | number; // 支持待办事项ID
 }
 
 // 添加自启动设置Want参数接口
@@ -188,21 +192,28 @@ struct AddSimpleTodoDialog {
   @Link todoName: string;
   @Link todoType: string;
   @Link todoDuration: number;
-  onConfirm: () => void = () => {};
+  onConfirm: () => void = () => {
+  };
   controller?: CustomDialogController;
 
   build() {
     Column() {
       Text("添加新待办").fontSize(20).fontWeight(FontWeight.Bold).margin({ bottom: 20 })
       TextInput({ placeholder: "待办名称", text: this.todoName })
-        .onChange(val => { this.todoName = val; })
+        .onChange(val => {
+          this.todoName = val;
+        })
         .margin({ bottom: 10 })
       TextInput({ placeholder: "类型 (如: 学习, 工作)", text: this.todoType })
-        .onChange(val => { this.todoType = val; })
+        .onChange(val => {
+          this.todoType = val;
+        })
         .margin({ bottom: 10 })
       TextInput({ placeholder: "时长 (分钟)", text: this.todoDuration.toString() })
         .type(InputType.Number)
-        .onChange(val => { this.todoDuration = Number(val) || 25; })
+        .onChange(val => {
+          this.todoDuration = Number(val) || 25;
+        })
         .margin({ bottom: 20 })
       Row({ space: 10 }) {
         Button("取消").onClick(() => this.controller?.close()).layoutWeight(1)
@@ -225,19 +236,32 @@ struct AddSimpleTodoDialog {
 struct Index {
   @State currentIndex: number = 0;
   @State bgColor: string = 'rgba(255, 192, 203, 0.15)';
-  // @State showCongratulationsDialog: boolean = false; // 暂时移除，或根据简单待办调整
-  @State isClockInMenuShow: boolean = false; // 保留打卡相关UI状态
-  @State isClockInStatsShow: boolean = false; // 保留打卡相关UI状态
-  @State isPermissionDialogShow: boolean = false; // 保留权限相关UI状态
-
-  // 替换 todoCollections 为 simpleTodos
-  @State simpleTodos: TodoItem[] = [
-    new TodoItem(1, "阅读ArkTS文档", "学习", 30),
-    new TodoItem(2, "编写示例代码", "学习", 45),
-    new TodoItem(3, "跑步", "锻炼", 20)
-  ];
-  private nextTodoId: number = 4; // 用于生成新的简单待办ID
-
+  @State isClockInMenuShow: boolean = false;
+  @State isClockInStatsShow: boolean = false;
+  @State isPermissionDialogShow: boolean = false;
+  @State isLoggedIn: boolean = false;
+  @State username: string = '';
+  @State password: string = '';
+  @State currentTheme: ThemeConfig = {
+    id: 'light',
+    name: '浅色主题',
+    primaryColor: '#007AFF',
+    backgroundColor: '#FFFFFF',
+    textColor: '#000000',
+    cardBackgroundColor: '#F8F8F8',
+    borderColor: '#E0E0E0',
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    errorColor: '#FF3B30'
+  };
+  private apiService: ApiService = ApiService.getInstance();
+  private themeService: ThemeService = ThemeService.getInstance();
+  private themeChangeListener = (theme: ThemeConfig) => {
+    this.currentTheme = theme;
+    console.info('Index页面主题已更新:', theme.name);
+  };
+  // 使用后端API的待办事项
+  @State simpleTodos: TodoItem[] = [];
+  @State isLoadingTodos: boolean = false;
   // @State selectedTodoId: number = -1; // 如果需要跟踪选中的简单待办，可以保留
   @State isOperationMenuShow: boolean = false; // 保留操作菜单状态 (可能用于简单待办的编辑/删除)
   // @State showAddTodoModal: boolean = false; // AddSimpleTodoDialog 有自己的controller
@@ -246,14 +270,11 @@ struct Index {
   @State newSimpleTodoName: string = '';
   @State newSimpleTodoType: string = '';
   @State newSimpleTodoDuration: number = 25;
-
-
   permissionList: PermissionItem[] = [
     new PermissionItem('通知权限', false),
     new PermissionItem('日历权限', false),
     new PermissionItem('位置权限', false)
   ];
-
   // // Dialog controller for adding collections (移除)
   // private addCollectionDialog: CustomDialogController = ... ;
 
@@ -263,16 +284,97 @@ struct Index {
       todoName: $newSimpleTodoName,
       todoType: $newSimpleTodoType,
       todoDuration: $newSimpleTodoDuration,
-      onConfirm: () => { this.addNewSimpleTodo(); }
+      onConfirm: () => {
+        this.addNewSimpleTodo();
+      }
     }),
     autoCancel: true,
     alignment: DialogAlignment.Center,
     customStyle: false // 根据需要设置
   });
 
-  aboutToAppear() {
-    console.info('Index aboutToAppear. CurrentIndex: ' + this.currentIndex);
-    this.currentIndex = 0; // 明确 Index 页面的 currentIndex
+  async aboutToAppear() {
+    this.checkLoginStatus();
+    // 注册主题变化监听器
+    this.themeService.addThemeChangeListener(this.themeChangeListener);
+    // 加载当前主题
+    try {
+      this.currentTheme = await this.themeService.getCurrentTheme();
+      console.info('Index页面加载主题:', this.currentTheme.name);
+    } catch (error) {
+      console.error('Index页面加载主题失败:', error);
+    }
+  }
+
+  aboutToDisappear() {
+    // 注销主题变化监听器
+    this.themeService.removeThemeChangeListener(this.themeChangeListener);
+  }
+
+  async checkLoginStatus() {
+    const savedUsername = await this.apiService.getUsername();
+    const savedToken = await this.apiService.getToken();
+
+    // 只有在同时存在用户名和有效token时才自动登录
+    if (savedUsername && savedToken) {
+      this.username = savedUsername;
+      this.isLoggedIn = true;
+      console.info('自动登录成功，用户:', this.username);
+      // 登录成功后加载待办事项
+      await this.loadTodos();
+    } else {
+      // 如果没有有效的登录状态，清除可能残留的数据
+      await this.apiService.clearAuth();
+      this.isLoggedIn = false;
+      console.info('未找到有效登录状态');
+    }
+  }
+
+  async handleLogin() {
+    console.info('点击登录，用户名:', this.username, '密码:', this.password);
+    try {
+      console.info('调用 ApiService.login');
+      const response = await this.apiService.login(this.username, this.password);
+      console.info('后端返回:', JSON.stringify(response));
+      await this.apiService.setToken(response.token);
+      await this.apiService.setUsername(this.username);
+      this.isLoggedIn = true;
+      promptAction.showToast({ message: '登录成功' });
+      // 登录成功后加载待办事项
+      await this.loadTodos();
+    } catch (error) {
+      console.error('登录失败详细信息:', JSON.stringify(error));
+      console.error('错误消息:', (error as Error).message);
+      promptAction.showToast({ message: '登录失败：' + (error as Error).message });
+    }
+  }
+
+  async handleRegister() {
+    try {
+      await this.apiService.register(this.username, this.password);
+      promptAction.showToast({ message: '注册成功，请登录' });
+    } catch (error) {
+      console.error('注册失败:', error);
+      promptAction.showToast({ message: '注册失败，请稍后重试' });
+    }
+  }
+
+  async handleLogout() {
+    await this.apiService.clearAuth();
+    this.isLoggedIn = false;
+    this.username = '';
+    this.password = '';
+    promptAction.showToast({ message: '已退出登录' });
+  }
+
+  async handleCheckIn() {
+    try {
+      await this.apiService.checkIn();
+      promptAction.showToast({ message: '打卡成功' });
+      this.isClockInMenuShow = false;
+    } catch (error) {
+      console.error('打卡失败:', error);
+    }
   }
 
   onPageShow() {
@@ -283,28 +385,23 @@ struct Index {
 
       if (routeParams.action === 'focusCompleted' && routeParams.todoId !== undefined) {
         const completedTodoId = Number(routeParams.todoId);
+        // 通过API更新待办状态
+        this.toggleTodoStatus(completedTodoId);
+
         const todo = this.simpleTodos.find(t => t.id === completedTodoId);
         if (todo) {
-          todo.isCompleted = true;
-          // 更新列表以触发UI刷新
-          this.simpleTodos = [...this.simpleTodos];
           promptAction.showToast({ message: `任务 "${todo.title}" 专注完成！` });
-
-          // 检查是否所有简单待办都已完成
-          // const allSimpleTodosDone = this.simpleTodos.every(t => t.isCompleted);
-          // if (allSimpleTodosDone) {
-          //   // this.showCongratulationsDialog = true; // 可选择性开启
-          //   // setTimeout(() => { this.showCongratulationsDialog = false; }, 5000);
-          //   promptAction.showToast({ message: "太棒了！所有待办都已完成！" });
-          // }
         }
       }
       // 移除所有与 sequenceAction, collectionId, completedSubTaskIndex 相关的处理逻辑
     }
     this.currentIndex = 0; // 确保在页面显示时 currentIndex 正确
+
+    // 每次页面显示时刷新数据
+    this.loadTodos();
   }
 
-  addNewSimpleTodo() {
+  async addNewSimpleTodo() {
     if (this.newSimpleTodoName.trim() === '') {
       promptAction.showToast({ message: '请输入待办名称' });
       return;
@@ -318,21 +415,101 @@ struct Index {
       return;
     }
 
-    const newTodo = new TodoItem(
-      this.nextTodoId++,
-      this.newSimpleTodoName.trim(),
-      this.newSimpleTodoType.trim(),
-      this.newSimpleTodoDuration
-    );
-    this.simpleTodos.push(newTodo);
-    // this.simpleTodos = [...this.simpleTodos]; // 如果直接push不更新UI，则使用此方法
+    try {
+      const todoData: TodoItemRequest = {
+        title: this.newSimpleTodoName.trim(),
+        description: this.newSimpleTodoType.trim(),
+        type: this.newSimpleTodoType.trim() || 'general',
+        duration: this.newSimpleTodoDuration,
+        isImportant: false,
+        isUrgent: false
+      };
 
-    // 重置输入框
-    this.newSimpleTodoName = '';
-    this.newSimpleTodoType = '';
-    this.newSimpleTodoDuration = 25;
+      const newTodo: ApiTodoItem = await this.apiService.createTodoItem(todoData);
 
-    promptAction.showToast({ message: "新待办已添加" });
+      // 转换为本地TodoItem格式
+      const localTodo = new TodoItem(
+        newTodo.id,
+        newTodo.title,
+        newTodo.type || 'general',
+        newTodo.duration || 25,
+        newTodo.completed
+      );
+
+      this.simpleTodos.push(localTodo);
+
+      // 重置输入框
+      this.newSimpleTodoName = '';
+      this.newSimpleTodoType = '';
+      this.newSimpleTodoDuration = 25;
+
+      promptAction.showToast({ message: "新待办已添加" });
+    } catch (error) {
+      console.error('添加待办失败:', error);
+      promptAction.showToast({ message: '添加待办失败：' + (error as Error).message });
+    }
+  }
+
+  // 加载待办事项
+  async loadTodos() {
+    if (!this.isLoggedIn) {
+      return;
+    }
+
+    try {
+      this.isLoadingTodos = true;
+      const todos: ApiTodoItem[] = await this.apiService.getTodoItems();
+
+      // 转换为本地TodoItem格式
+      this.simpleTodos = todos.map((todo: ApiTodoItem) => new TodoItem(
+        todo.id,
+        todo.title,
+        todo.type || 'general',
+        todo.duration || 25,
+        todo.completed
+      ));
+    } catch (error) {
+      console.error('加载待办事项失败:', error);
+      promptAction.showToast({ message: '加载待办事项失败' });
+    } finally {
+      this.isLoadingTodos = false;
+    }
+  }
+
+  // 切换待办完成状态
+  async toggleTodoStatus(todoId: number) {
+    try {
+      const updatedTodo: ApiTodoItem = await this.apiService.toggleTodoItemStatus(todoId);
+
+      // 更新本地状态
+      const index = this.simpleTodos.findIndex(t => t.id === todoId);
+      if (index !== -1) {
+        this.simpleTodos[index].isCompleted = updatedTodo.completed;
+        this.simpleTodos = Array.from(this.simpleTodos); // 触发UI更新
+      }
+
+      promptAction.showToast({
+        message: updatedTodo.completed ? '任务已完成' : '任务已重新激活'
+      });
+    } catch (error) {
+      console.error('更新待办状态失败:', error);
+      promptAction.showToast({ message: '更新状态失败' });
+    }
+  }
+
+  // 删除待办事项
+  async deleteTodo(todoId: number) {
+    try {
+      await this.apiService.deleteTodoItem(todoId);
+
+      // 从本地列表中移除
+      this.simpleTodos = this.simpleTodos.filter(t => t.id !== todoId);
+
+      promptAction.showToast({ message: '待办已删除' });
+    } catch (error) {
+      console.error('删除待办失败:', error);
+      promptAction.showToast({ message: '删除失败' });
+    }
   }
 
   // // startSequenceTask (移除)
@@ -415,115 +592,305 @@ struct Index {
     // This function should create a Want object based on options
     // Placeholder implementation
     let want: Want = {
-        bundleName: options.bundleName,
-        abilityName: options.abilityName,
-        uri: options.uri,
-        parameters: options.parameters,
-        action: options.action
+      bundleName: options.bundleName,
+      abilityName: options.abilityName,
+      uri: options.uri,
+      parameters: options.parameters,
+      action: options.action
     };
     // Make sure Want conforms to SystemWant, or SystemWant is an interface Want implements
     return want as SystemWant;
   }
+
   // --- End of Placeholder ---
 
-  build() {
-    Stack() {
+  // 删除简单待办按钮构建器
+  @Builder
+  deleteSimpleTodoBuilder(todo: TodoItem) {
+    Row() {
       Column() {
-        // 顶部标题栏
-        Row() {
-          Text('待办列表')
-            .fontSize(22).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
-          Blank()
-          Row({ space: 16 }) {
-            Row() {
-              Text('必开').fontSize(14).fontColor('#FFFFFF')
-              Text('权限').fontSize(14).fontColor('#FFFFFF')
+        Text('🗑️')
+          .fontSize(18)
+          .margin({ bottom: 2 })
+        Text('删除')
+          .fontSize(12)
+          .fontColor(Color.White)
+          .fontWeight(FontWeight.Medium)
+      }
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+      .width(80)
+      .height('100%')
+      .linearGradient({
+        direction: GradientDirection.Bottom,
+        colors: [['#FF6B6B', 0.0], ['#FF3B30', 1.0]]
+      })
+      .shadow({
+        radius: 8,
+        color: 'rgba(255, 59, 48, 0.3)',
+        offsetX: 2,
+        offsetY: 2
+      })
+      .onClick(() => {
+        AlertDialog.show({
+          title: '确认删除',
+          message: `确定要删除待办事项"${todo.title}"吗？`,
+          primaryButton: {
+            value: '取消',
+            action: () => {}
+          },
+          secondaryButton: {
+            value: '删除',
+            fontColor: '#FF3B30',
+            action: () => {
+              this.deleteTodo(todo.id);
             }
-            .backgroundColor('rgba(255, 255, 255, 0.2)')
-            .borderRadius(12).padding({ left: 8, right: 8, top: 4, bottom: 4 })
-            .margin({ right: 4 })
-            .onClick(() => { this.handlePermissionSettings(); })
-            Text('✓').fontSize(24).fontColor('#FFFFFF')
-              .onClick(() => { promptAction.showToast({message: "打卡菜单待实现"}); })
-            Text('+').fontSize(24).fontColor('#FFFFFF')
-            .onClick(() => {
-                this.newSimpleTodoName = '';
-                this.newSimpleTodoType = '';
-                this.newSimpleTodoDuration = 25;
-                this.addSimpleTodoDialogController.open();
-              })
-            Text('≡').fontSize(24).fontColor('#FFFFFF')
-              .onClick(() => { promptAction.showToast({message: "更多菜单待实现"}); })
           }
+        });
+      })
+      .gesture(
+        TapGesture()
+          .onAction(() => {
+            // 添加点击动画效果
+            animateTo({
+              duration: 150,
+              curve: Curve.FastOutSlowIn
+            }, () => {
+              // 点击反馈动画
+            })
+          })
+      )
+      .stateStyles({
+        pressed: {
+          .backgroundColor('#D32F2F')
+          .scale({ x: 0.95, y: 0.95 })
+        },
+        normal: {
+          .backgroundColor('transparent')
+          .scale({ x: 1.0, y: 1.0 })
+        }
+      })
+    }
+    .width(80)
+    .height('100%')
+    .backgroundColor('transparent')
+  }
+
+  build() {
+    Column() {
+      if (!this.isLoggedIn) {
+        // 登录表单
+        Column() {
+          Text('鸿蒙每日打卡')
+            .fontSize(28)
+            .fontWeight(FontWeight.Bold)
+            .margin({ top: 50, bottom: 30 })
+
+          TextInput({ placeholder: '用户名', text: this.username })
+            .width('80%')
+            .height(50)
+            .margin({ bottom: 20 })
+            .onChange((value: string) => {
+              this.username = value;
+            })
+
+          TextInput({ placeholder: '密码', text: this.password })
+            .width('80%')
+            .height(50)
+            .margin({ bottom: 30 })
+            .type(InputType.Password)
+            .onChange((value: string) => {
+              this.password = value;
+            })
+
+          Button('登录')
+            .width('80%')
+            .height(50)
+            .backgroundColor('#8A2BE2')
+            .onClick(() => {
+              this.handleLogin();
+            })
+
+          Button('注册')
+            .width('80%')
+            .height(50)
+            .margin({ top: 20 })
+            .backgroundColor('#F5F5F5')
+            .fontColor('#8A2BE2')
+            .onClick(() => {
+              this.handleRegister();
+            })
         }
         .width('100%')
-        .height(50)
-        .padding({ left: 16, right: 16 })
-        .linearGradient({ angle: 90, colors: [['#8A2BE2', 0.0], ['#FF1493', 1.0]] })
-
-        // 内容区域
-        Scroll() {
-          Column({ space: 10 }) {
-            ForEach(this.simpleTodos, (todo: TodoItem) => {
-              Row() {
-                Column() {
-                  Text(todo.title)
-                    .fontSize(18)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#333333')
-                    .decoration({type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None })
-                  Text(`${todo.type} - ${todo.formatDuration()}`)
-                    .fontSize(14)
-                    .fontColor('#666666')
-                    .decoration({type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None })
-                    .margin({top: 4})
+        .height('100%')
+        .backgroundColor('#FFFFFF')
+      } else {
+        // 主界面内容
+        Stack() {
+          Column() {
+            // 顶部标题栏
+            Row() {
+              Text('待办列表')
+                .fontSize(22).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
+              Blank()
+              Row({ space: 16 }) {
+                Row() {
+                  Text('必开').fontSize(14).fontColor('#FFFFFF')
+                  Text('权限').fontSize(14).fontColor('#FFFFFF')
                 }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start)
+                .backgroundColor('rgba(255, 255, 255, 0.2)')
+                .borderRadius(12)
+                .padding({
+                  left: 8,
+                  right: 8,
+                  top: 4,
+                  bottom: 4
+                })
+                .margin({ right: 4 })
+                .onClick(() => {
+                  this.handlePermissionSettings();
+                })
 
-                Button('开始专注')
-                  .fontSize(14)
-                  .fontColor(Color.White)
-                  .backgroundColor('#4682B4')
-                  .borderRadius(12)
-                  .height(32)
-                  .padding({left: 8, right: 8})
-                  .margin({left: 10})
+                Text('✓').fontSize(24).fontColor('#FFFFFF')
                   .onClick(() => {
-                      const params: FocusTimerRouterParams = {
-                      title: todo.title,
-                      taskTitle: todo.title,
-                      time: todo.duration * 60,
-                      todoId: todo.id,
-                      isSequence: false
-                    };
-                    router.pushUrl({ url: 'pages/FocusTimer', params: params })
-                      .catch((err: Error) => { console.error(`跳转FocusTimer出错: ${err.message}`); });
+                    promptAction.showToast({ message: "打卡菜单待实现" });
                   })
-                  .visibility(todo.isCompleted ? Visibility.Hidden : Visibility.Visible)
+                Text('+').fontSize(24).fontColor('#FFFFFF')
+                  .onClick(() => {
+                    this.newSimpleTodoName = '';
+                    this.newSimpleTodoType = '';
+                    this.newSimpleTodoDuration = 25;
+                    this.addSimpleTodoDialogController.open();
+                  })
+                Text('≡').fontSize(24).fontColor('#FFFFFF')
+                  .onClick(() => {
+                    promptAction.showToast({ message: "更多菜单待实现" });
+                  })
+              }
+            }
+            .width('100%')
+            .height(50)
+            .padding({ left: 16, right: 16 })
+            .backgroundColor(this.currentTheme.primaryColor)
+
+            // 内容区域
+            Scroll() {
+              Column({ space: 10 }) {
+                if (this.isLoadingTodos) {
+                  Row() {
+                    LoadingProgress()
+                      .width(30)
+                      .height(30)
+                      .margin({ right: 10 })
+                    Text('加载中...')
+                      .fontSize(16)
+                      .fontColor(this.currentTheme.textColor)
+                  }
+                  .width('100%')
+                  .justifyContent(FlexAlign.Center)
+                  .padding(20)
+                } else if (this.simpleTodos.length === 0) {
+                  Column() {
+                    Text('暂无待办事项')
+                      .fontSize(16)
+                      .fontColor(this.currentTheme.textColor)
+                      .opacity(0.6)
+                    Text('点击右上角 + 号添加新的待办')
+                      .fontSize(14)
+                      .fontColor(this.currentTheme.textColor)
+                      .opacity(0.4)
+                      .margin({ top: 8 })
+                  }
+                  .width('100%')
+                  .justifyContent(FlexAlign.Center)
+                  .padding(40)
+                } else {
+                  List({ space: 10 }) {
+                    ForEach(this.simpleTodos, (todo: TodoItem) => {
+                      ListItem() {
+                        Row() {
+                          Column() {
+                            Text(todo.title)
+                              .fontSize(18)
+                              .fontWeight(FontWeight.Bold)
+                              .fontColor(this.currentTheme.textColor)
+                              .decoration({
+                                type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
+                              })
+                              .opacity(todo.isCompleted ? 0.6 : 1.0)
+                              .textAlign(TextAlign.Start)
+                            Text(`${todo.type} - ${todo.formatDuration()}`)
+                              .fontSize(14)
+                              .fontColor(this.currentTheme.textColor)
+                              .opacity(todo.isCompleted ? 0.4 : 0.7)
+                              .decoration({
+                                type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
+                              })
+                              .margin({ top: 4 })
+                              .textAlign(TextAlign.Start)
+                          }
+                          .layoutWeight(1)
+                          .alignItems(HorizontalAlign.Start)
+
+                          // 只保留专注按钮
+                          if (!todo.isCompleted) {
+                            Button('专注')
+                              .fontSize(12)
+                              .fontColor(Color.White)
+                              .backgroundColor(this.currentTheme.primaryColor)
+                              .borderRadius(8)
+                              .height(28)
+                              .padding({ left: 8, right: 8 })
+                              .onClick(() => {
+                                const params: FocusTimerRouterParams = {
+                                  title: todo.title,
+                                  taskTitle: todo.title,
+                                  time: todo.duration * 60,
+                                  todoId: todo.id,
+                                  isSequence: false
+                                };
+                                router.pushUrl({ url: 'pages/FocusTimer', params: params })
+                                  .catch((err: Error) => {
+                                    console.error(`跳转FocusTimer出错: ${err.message}`);
+                                  });
+                              })
+                          }
+                        }
+                        .width('100%')
+                        .backgroundColor(this.currentTheme.cardBackgroundColor)
+                        .borderRadius(8)
+                        .padding(12)
+                        .opacity(todo.isCompleted ? 0.7 : 1.0)
+                      }
+                      .swipeAction({
+                        end: {
+                          builder: () => {
+                            this.deleteSimpleTodoBuilder(todo)
+                          }
+                        }
+                      })
+                    }, (todo: TodoItem) => todo.id.toString())
+                  }
+                  .width('100%')
+                  .divider({ strokeWidth: 0 }) // 移除分割线
+                }
               }
               .width('100%')
-              .backgroundColor(Color.White)
-              .borderRadius(8)
-              .padding(12)
-            }, (todo: TodoItem) => todo.id.toString())
+              .padding(16)
+            }
+            .layoutWeight(1)
+
+            // 底部导航栏
+            TabBar({ currentIndex: 0 })
           }
           .width('100%')
-          .padding(16)
+          .height('100%')
+          .backgroundColor(this.currentTheme.backgroundColor)
         }
-        .layoutWeight(1)
-
-        // 底部导航栏
-        TabBar({ currentIndex: 0 })
       }
-        .width('100%')
-      .height('100%')
-      .backgroundColor(this.bgColor)
-      }
-      .width('100%')
-      .height('100%')
+    }
   }
-  }
+}
 
 // // Minimal TodoItem class is already defined above
 // // class TodoItem { ... }
