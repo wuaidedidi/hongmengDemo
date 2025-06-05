@@ -1,0 +1,15 @@
+{
+    "environments": {
+        "development": {
+            "apiBaseUrl": "http://10.0.2.2:8080/api",
+            "debug": true,
+            "logLevel": "debug"
+        },
+        "production": {
+            "apiBaseUrl": "http://8.148.20.194:8080/api",
+            "debug": false,
+            "logLevel": "error"
+        }
+    },
+    "currentEnvironment": "production"
+}

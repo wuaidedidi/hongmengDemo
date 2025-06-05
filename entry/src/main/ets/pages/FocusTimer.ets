@@ -46,10 +46,10 @@ struct NextTaskDialog {
   nextItem: TodoCollectionItem = { 
     id: 0, 
     title: '', 
-    completed: false, 
-    order: 0,
+    isCompleted: false, 
+    orderIndex: 0,
     collectionId: 0,
-    createdAt: ''
+    createTime: ''
   };
   nextIndex: number = 0;
   actualTotalTasks: number = 0;
@@ -544,7 +544,7 @@ struct FocusTimer {
       console.info(`获取合集${params.collectionId}的所有子任务`);
       const collectionItems = await this.apiService.getCollectionItems(Number(params.collectionId));
       const taskLogInfos: TaskLogInfo[] = collectionItems.map((item: TodoCollectionItem): TaskLogInfo => {
-        return { id: item.id, title: item.title, completed: item.completed };
+        return { id: item.id, title: item.title, completed: item.isCompleted };
       });
       console.info(`获取到${collectionItems.length}个子任务:`, taskLogInfos);
       
@@ -585,7 +585,7 @@ struct FocusTimer {
         id: nextItem.id, 
         title: nextItem.title, 
         index: nextIndex, 
-        completed: nextItem.completed 
+        completed: nextItem.isCompleted 
       };
       console.info(`下一个任务:`, nextTaskLogInfo);
       

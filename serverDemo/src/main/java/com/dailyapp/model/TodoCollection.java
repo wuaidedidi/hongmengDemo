@@ -6,8 +6,6 @@ import lombok.AllArgsConstructor;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.ArrayList;
 
 @Entity
 @Table(name = "todo_collections")
@@ -40,16 +38,9 @@ public class TodoCollection {
     @Column
     private LocalDateTime completedTime;
     
-    @OneToMany(mappedBy = "collectionId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<TodoCollectionItem> items = new ArrayList<>();
-    
     @PrePersist
     protected void onCreate() {
         createTime = LocalDateTime.now();
-    }
-    
-    public boolean isAllItemsCompleted() {
-        return items.stream().allMatch(TodoCollectionItem::getIsCompleted);
     }
     
     public void markCompleted() {

@@ -1,8 +1,9 @@
 import http from '@ohos.net.http';
 import promptAction from '@ohos.promptAction';
 import preferences from '@ohos.data.preferences';
+import { ConfigService } from './ConfigService';
 
-const BASE_URL = 'http://10.0.2.2:8080/api';
+// const BASE_URL = 'http://10.0.2.2:8080/api'; // 移除硬编码
 const PREFERENCES_NAME = 'dailyapp_preferences';
 const TOKEN_KEY = 'auth_token';
 const USERNAME_KEY = 'username';
@@ -91,11 +92,11 @@ export interface TodoCollectionItem {
   id: number;
   title: string;
   description?: string;
-  completed: boolean;
-  order: number;
+  isCompleted: boolean;
+  orderIndex: number;
   collectionId: number;
-  createdAt: string;
-  updatedAt?: string;
+  createTime: string;
+  durationMinutes?: number;
 }
 
 export interface TodoCollectionRequest {
@@ -106,7 +107,8 @@ export interface TodoCollectionRequest {
 export interface TodoCollectionItemRequest {
   title: string;
   description?: string;
-  order?: number;
+  durationMinutes?: number;
+  orderIndex?: number;
 }
 
 export class ApiService {
@@ -114,6 +116,8 @@ export class ApiService {
   private token: string = '';
   private preferences: preferences.Preferences | null = null;
   private initPromise: Promise<void> | null = null;
+  private configService: ConfigService = ConfigService.getInstance();
+  private baseUrl: string = '';
 
   private constructor() {
     this.initPromise = this.initPreferences();
@@ -121,6 +125,11 @@ export class ApiService {
 
   private async initPreferences() {
     try {
+      // 初始化配置服务
+      await this.configService.initialize();
+      this.baseUrl = this.configService.getApiBaseUrl();
+      console.info('API Base URL:', this.baseUrl);
+
       const context = getContext(this);
       this.preferences = await preferences.getPreferences(context, PREFERENCES_NAME);
       // 从本地存储加载token
@@ -233,14 +242,14 @@ export class ApiService {
   async login(username: string, password: string): Promise<AuthResponse> {
     try {
       console.info(`尝试登录: username=${username}`);
-      console.info(`请求URL: ${BASE_URL}/auth/login`);
+      console.info(`请求URL: ${this.baseUrl}/auth/login`);
       const headers = await this.getHeaders();
       console.info(`请求头: ${JSON.stringify(headers)}`);
       console.info(`请求数据: ${JSON.stringify({ username, password })}`);
 
       let httpRequest = http.createHttp();
       let response = await httpRequest.request(
-        `${BASE_URL}/auth/login`,
+        `${this.baseUrl}/auth/login`,
         {
           method: http.RequestMethod.POST,
           header: headers,
@@ -270,7 +279,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/auth/register`,
+        `${this.baseUrl}/auth/register`,
         {
           method: http.RequestMethod.POST,
           header: headers,
@@ -298,7 +307,7 @@ export class ApiService {
       console.info('请求头:', JSON.stringify(headers));
       
       let response = await httpRequest.request(
-        `${BASE_URL}/sessions`,
+        `${this.baseUrl}/sessions`,
         {
           method: http.RequestMethod.POST,
           header: headers,
@@ -338,7 +347,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/sessions/daily?date=${date}`,
+        `${this.baseUrl}/sessions/daily?date=${date}`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -360,7 +369,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/sessions/weekly?weekStart=${weekStart}`,
+        `${this.baseUrl}/sessions/weekly?weekStart=${weekStart}`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -382,7 +391,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/sessions/monthly?monthStart=${monthStart}`,
+        `${this.baseUrl}/sessions/monthly?monthStart=${monthStart}`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -404,7 +413,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/sessions/statistics`,
+        `${this.baseUrl}/sessions/statistics`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -426,7 +435,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/check-in`,
+        `${this.baseUrl}/check-in`,
         {
           method: http.RequestMethod.POST,
           header: headers
@@ -448,7 +457,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/check-in/streak`,
+        `${this.baseUrl}/check-in/streak`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -470,7 +479,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/check-in/today`,
+        `${this.baseUrl}/check-in/today`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -493,7 +502,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos`,
+        `${this.baseUrl}/todos`,
         {
           method: http.RequestMethod.POST,
           header: headers,
@@ -517,10 +526,10 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       console.log('🔍 请求头:', JSON.stringify(headers));
-      console.log('🔍 请求URL:', `${BASE_URL}/todos`);
+      console.log('🔍 请求URL:', `${this.baseUrl}/todos`);
       
       let response = await httpRequest.request(
-        `${BASE_URL}/todos`,
+        `${this.baseUrl}/todos`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -549,7 +558,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos/${todoId}/toggle`,
+        `${this.baseUrl}/todos/${todoId}/toggle`,
         {
           method: http.RequestMethod.PUT,
           header: headers
@@ -571,7 +580,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos/${todoId}`,
+        `${this.baseUrl}/todos/${todoId}`,
         {
           method: http.RequestMethod.DELETE,
           header: headers
@@ -592,7 +601,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos/status/${isCompleted}`,
+        `${this.baseUrl}/todos/status/${isCompleted}`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -615,7 +624,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos/type/${type}`,
+        `${this.baseUrl}/todos/type/${type}`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -638,7 +647,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos/date-range?startDate=${startDate}&endDate=${endDate}`,
+        `${this.baseUrl}/todos/date-range?startDate=${startDate}&endDate=${endDate}`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -661,7 +670,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos/${todoId}`,
+        `${this.baseUrl}/todos/${todoId}`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -684,7 +693,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos/${todoId}`,
+        `${this.baseUrl}/todos/${todoId}`,
         {
           method: http.RequestMethod.PUT,
           header: headers,
@@ -708,7 +717,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todos/${todoId}/focus-time`,
+        `${this.baseUrl}/todos/${todoId}/focus-time`,
         {
           method: http.RequestMethod.PUT,
           header: headers,
@@ -731,7 +740,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections`,
+        `${this.baseUrl}/todo-collections`,
         {
           method: http.RequestMethod.POST,
           header: headers,
@@ -763,7 +772,7 @@ export class ApiService {
       console.info('发送待办合集请求:', requestBody);
       
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections`,
+        `${this.baseUrl}/todo-collections`,
         {
           method: http.RequestMethod.POST,
           header: headers,
@@ -801,7 +810,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections`,
+        `${this.baseUrl}/todo-collections`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -823,7 +832,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}`,
+        `${this.baseUrl}/todo-collections/${collectionId}`,
         {
           method: http.RequestMethod.DELETE,
           header: headers
@@ -844,7 +853,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}`,
+        `${this.baseUrl}/todo-collections/${collectionId}`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -867,7 +876,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}/items`,
+        `${this.baseUrl}/todo-collections/${collectionId}/items`,
         {
           method: http.RequestMethod.GET,
           header: headers
@@ -890,7 +899,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}`,
+        `${this.baseUrl}/todo-collections/${collectionId}`,
         {
           method: http.RequestMethod.PUT,
           header: headers,
@@ -914,7 +923,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}/items`,
+        `${this.baseUrl}/todo-collections/${collectionId}/items`,
         {
           method: http.RequestMethod.POST,
           header: headers,
@@ -938,7 +947,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}/items/${itemId}/toggle`,
+        `${this.baseUrl}/todo-collections/${collectionId}/items/${itemId}/toggle`,
         {
           method: http.RequestMethod.PUT,
           header: headers
@@ -961,7 +970,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}/sequence/start`,
+        `${this.baseUrl}/todo-collections/${collectionId}/sequence/start`,
         {
           method: http.RequestMethod.PUT,
           header: headers
@@ -984,7 +993,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}/sequence/stop`,
+        `${this.baseUrl}/todo-collections/${collectionId}/sequence/stop`,
         {
           method: http.RequestMethod.PUT,
           header: headers
@@ -1007,7 +1016,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}/sequence/next`,
+        `${this.baseUrl}/todo-collections/${collectionId}/sequence/next`,
         {
           method: http.RequestMethod.PUT,
           header: headers
@@ -1030,7 +1039,7 @@ export class ApiService {
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
-        `${BASE_URL}/todo-collections/${collectionId}/items/${itemId}`,
+        `${this.baseUrl}/todo-collections/${collectionId}/items/${itemId}`,
         {
           method: http.RequestMethod.DELETE,
           header: headers

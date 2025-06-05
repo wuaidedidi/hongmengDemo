@@ -96,7 +96,7 @@ struct TodoPage {
     for (let collectionId of expandedIds) {
       try {
         await this.loadCollectionItems(collectionId);
-      } catch (error) {
+    } catch (error) {
         console.error(`重新加载合集${collectionId}子待办失败:`, error);
       }
     }
@@ -186,13 +186,15 @@ struct TodoPage {
   // 添加子待办
   async addSubTodo(collectionId: number, title: string, description?: string, durationMinutes: number = 25): Promise<void> {
     try {
+      console.info(`发送添加子待办请求 - 合集ID: ${collectionId}, 标题: ${title}, 时长: ${durationMinutes}分钟`);
+      
       const newItem = await this.apiService.addItemToCollection(collectionId, {
         title,
         description,
-        order: 0  // 后端会自动处理顺序
+        durationMinutes,
+        orderIndex: 0
       });
       
-      // 更新本地状态
       const existingItems = this.collectionItems.get(collectionId) || [];
       existingItems.push(newItem);
       this.collectionItems.set(collectionId, existingItems);
@@ -229,15 +231,15 @@ struct TodoPage {
       const updatedItem = await this.apiService.toggleCollectionItemStatus(collectionId, itemId);
       
       // 更新本地状态
-      const existingItems = this.collectionItems.get(collectionId) || [];
-      const index = existingItems.findIndex(item => item.id === itemId);
-      if (index !== -1) {
-        existingItems[index] = updatedItem;
-        this.collectionItems.set(collectionId, [...existingItems]);
+      const items = this.collectionItems.get(collectionId) || [];
+      const itemIndex = items.findIndex(item => item.id === itemId);
+      if (itemIndex !== -1) {
+        items[itemIndex] = updatedItem;
+        this.collectionItems.set(collectionId, items);
         this.collectionItems = new Map(this.collectionItems);
       }
       
-      const message = updatedItem.completed ? '子待办已完成' : '子待办已重新激活';
+      const message = updatedItem.isCompleted ? '子待办已完成' : '子待办已重新激活';
       promptAction.showToast(new ToastOptions(message));
     } catch (error) {
       console.error('更新子待办状态失败:', error);
@@ -257,7 +259,7 @@ struct TodoPage {
       promptAction.showToast(new ToastOptions('找不到指定的子待办'));
       return;
     }
-
+    
     const currentItem = items[currentIndex];
     console.info(`当前任务信息:`, { id: currentItem.id, title: currentItem.title, index: currentIndex });
     
@@ -317,15 +319,19 @@ struct TodoPage {
       return;
     }
 
-    // 从第一个未完成的子待办开始
-    const firstIncompleteIndex = items.findIndex(item => !item.completed);
+    // 查找第一个未完成的任务作为起始点
+    const firstIncompleteIndex = items.findIndex(item => !item.isCompleted);
     const startIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex;
-    const firstItem = items[startIndex];
     
-    console.info(`序列开始信息:`, { 
-      startIndex, 
-      firstIncompleteIndex, 
-      firstItem: { id: firstItem.id, title: firstItem.title, completed: firstItem.completed },
+    if (startIndex >= items.length) {
+      promptAction.showToast(new ToastOptions('没有可用的任务'));
+      return;
+    }
+    
+    const firstItem = items[startIndex];
+    console.info(`序列起始任务:`, { 
+      firstItem: { id: firstItem.id, title: firstItem.title, isCompleted: firstItem.isCompleted },
+      startIndex: startIndex,
       totalItems: items.length
     });
 
@@ -400,7 +406,7 @@ struct TodoPage {
       .padding(40)
     } else {
       List({ space: 8 }) {
-        ForEach(this.todoCollections, (collection: TodoCollection) => {
+      ForEach(this.todoCollections, (collection: TodoCollection) => {
           ListItem() {
             this.buildCollectionItemView(collection)
           }
@@ -421,9 +427,9 @@ struct TodoPage {
   // 构建合集项视图
   @Builder
   buildCollectionItemView(collection: TodoCollection) {
-    Column() {
+        Column() {
       // 合集主行
-      Row() {
+          Row() {
         // 展开/折叠指示器
         Text(this.expandedCollections.has(collection.id) ? '▼' : '▶')
           .fontSize(14)
@@ -434,45 +440,45 @@ struct TodoPage {
             this.toggleCollectionExpanded(collection.id);
           })
 
-        Column() {
-          Text(collection.title)
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.currentTheme.textColor)
-          
-          if (collection.description) {
-            Text(collection.description)
-              .fontSize(14)
-              .fontColor(this.currentTheme.textColor)
-              .opacity(0.6)
-              .margin({ top: 4 })
-          }
-          
+            Column() {
+              Text(collection.title)
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.currentTheme.textColor)
+              
+              if (collection.description) {
+                Text(collection.description)
+                  .fontSize(14)
+                  .fontColor(this.currentTheme.textColor)
+                  .opacity(0.6)
+                  .margin({ top: 4 })
+              }
+              
           Text(this.getItemCountText(collection.id))
-            .fontSize(12)
-            .fontColor(this.currentTheme.textColor)
-            .opacity(0.5)
-            .margin({ top: 4 })
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-        .onClick(() => {
+                .fontSize(12)
+                .fontColor(this.currentTheme.textColor)
+                .opacity(0.5)
+                .margin({ top: 4 })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+                .onClick(() => {
           this.toggleCollectionExpanded(collection.id);
-        })
-
+                })
+              
         Button('开始序列')
-          .fontSize(12)
-          .fontColor(Color.White)
+                .fontSize(12)
+                .fontColor(Color.White)
           .backgroundColor(this.currentTheme.primaryColor)
-          .borderRadius(8)
-          .height(28)
-          .padding({left: 8, right: 8})
+                .borderRadius(8)
+                .height(28)
+                .padding({left: 8, right: 8})
           .onClick(async () => {
             await this.startFocusForCollection(collection);
           })
-      }
-      .width('100%')
-      .padding(12)
+          }
+          .width('100%')
+          .padding(12)
 
       // 子待办列表（展开时显示）
       if (this.expandedCollections.has(collection.id)) {
@@ -487,10 +493,10 @@ struct TodoPage {
   // 构建子项列表
   @Builder
   buildSubItemsList(collectionId: number) {
-    Divider()
-      .color(this.currentTheme.borderColor)
-      .margin({ left: 12, right: 12 })
-
+            Divider()
+              .color(this.currentTheme.borderColor)
+              .margin({ left: 12, right: 12 })
+            
     if (this.loadingItems.has(collectionId)) {
       Row() {
         LoadingProgress()
@@ -551,41 +557,42 @@ struct TodoPage {
   // 构建子项行
   @Builder
   buildSubItemRow(item: TodoCollectionItem, index: number, collectionId: number) {
-    Row() {
-      Text(`${index + 1}.`)
-        .fontSize(14)
-        .fontColor(this.currentTheme.textColor)
-        .opacity(0.6)
+                Row() {
+                  Text(`${index + 1}.`)
+                    .fontSize(14)
+                    .fontColor(this.currentTheme.textColor)
+                    .opacity(0.6)
         .width(30)
-      
-      Column() {
-        Text(item.title)
-          .fontSize(14)
-          .fontColor(this.currentTheme.textColor)
-          .decoration({type: item.completed ? TextDecorationType.LineThrough : TextDecorationType.None })
-          .opacity(item.completed ? 0.6 : 1.0)
-        
-        if (item.description) {
-          Text(item.description)
-            .fontSize(12)
-            .fontColor(this.currentTheme.textColor)
-            .opacity(item.completed ? 0.4 : 0.6)
-            .margin({ top: 2 })
-        }
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
-      
+                  
+                  Column() {
+                    Text(item.title)
+                      .fontSize(14)
+                      .fontColor(this.currentTheme.textColor)
+          .decoration({type: item.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None })
+          .opacity(item.isCompleted ? 0.6 : 1.0)
+                              .textAlign(TextAlign.Start)
+                    
+                    if (item.description) {
+                      Text(item.description)
+                        .fontSize(12)
+                        .fontColor(this.currentTheme.textColor)
+            .opacity(item.isCompleted ? 0.4 : 0.6)
+                        .margin({ top: 2 })
+                    }
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Start)
+                  
       Text('25min') // 默认25分钟，因为ApiService中的TodoCollectionItem没有durationMinutes属性
-        .fontSize(12)
-        .fontColor(this.currentTheme.textColor)
-        .opacity(0.5)
+                    .fontSize(12)
+                    .fontColor(this.currentTheme.textColor)
+                    .opacity(0.5)
         .margin({ right: 8 })
-      
-      if (item.completed) {
-        Text('✓')
-          .fontSize(16)
-          .fontColor('#34C759')
+                  
+      if (item.isCompleted) {
+                    Text('✓')
+                      .fontSize(16)
+                      .fontColor('#34C759')
           .margin({ right: 8 })
       }
 
@@ -599,11 +606,11 @@ struct TodoPage {
         .onClick(() => {
           this.startFocusForSubTodo(collectionId, item.id);
         })
-    }
-    .width('100%')
-    .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-    .backgroundColor(item.completed ? 'rgba(0, 0, 0, 0.05)' : 'transparent')
-    .borderRadius(4)
+                }
+                .width('100%')
+                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+    .backgroundColor(item.isCompleted ? 'rgba(0, 0, 0, 0.05)' : 'transparent')
+                .borderRadius(4)
     .onClick(() => {
       this.toggleSubTodoStatus(collectionId, item.id);
     })
@@ -772,7 +779,7 @@ struct TodoPage {
           .fontColor('#FFFFFF')
           .backgroundColor('transparent')
           .onClick(() => {
-            this.addTodoCollectionDialogController.open();
+              this.addTodoCollectionDialogController.open();
           })
       }
       .width('100%')
@@ -783,7 +790,7 @@ struct TodoPage {
       // 内容区域
       Scroll() {
         Column() {
-          this.buildTodoCollectionsList()
+            this.buildTodoCollectionsList()
         }
         .width('100%')
         .padding(16)

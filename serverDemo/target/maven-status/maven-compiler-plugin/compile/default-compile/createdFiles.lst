@@ -24,6 +24,7 @@ com\dailyapp\controller\FocusSessionController.class
 com\dailyapp\dto\TodoCollectionRequest.class
 com\dailyapp\config\SecurityConfig.class
 com\dailyapp\controller\CheckInController.class
+com\dailyapp\controller\HealthController.class
 com\dailyapp\dto\AuthRequest.class
 com\dailyapp\controller\AuthController.class
 com\dailyapp\DailyAppApplication.class
@@ -33,5 +34,6 @@ com\dailyapp\service\TodoItemService.class
 com\dailyapp\repository\TodoCollectionItemRepository.class
 com\dailyapp\model\TodoCollectionItem.class
 com\dailyapp\service\AuthService.class
+com\dailyapp\config\CorsConfig.class
 com\dailyapp\dto\FocusSessionRequest.class
 com\dailyapp\repository\CheckInRepository.class

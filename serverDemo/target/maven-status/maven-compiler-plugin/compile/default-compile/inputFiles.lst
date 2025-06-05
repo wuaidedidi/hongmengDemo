@@ -22,11 +22,13 @@ E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\controller
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\dto\StatisticsResponse.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\repository\TodoCollectionItemRepository.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\controller\TodoItemController.java
+E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\config\CorsConfig.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\repository\TodoItemRepository.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\security\JwtService.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\dto\TodoCollectionRequest.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\dto\TodoItemRequest.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\model\TodoCollection.java
+E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\controller\HealthController.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\controller\AuthController.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\model\CheckIn.java
 E:\harmonsProject\MyTestProject\serverDemo\src\main\java\com\dailyapp\service\TodoItemService.java

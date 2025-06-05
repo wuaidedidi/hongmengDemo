@@ -806,61 +806,61 @@ struct Index {
                   .padding(40)
                 } else {
                   List({ space: 10 }) {
-                    ForEach(this.simpleTodos, (todo: TodoItem) => {
+                  ForEach(this.simpleTodos, (todo: TodoItem) => {
                       ListItem() {
-                        Row() {
-                          Column() {
-                            Text(todo.title)
-                              .fontSize(18)
-                              .fontWeight(FontWeight.Bold)
-                              .fontColor(this.currentTheme.textColor)
-                              .decoration({
-                                type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
-                              })
-                              .opacity(todo.isCompleted ? 0.6 : 1.0)
+                    Row() {
+                      Column() {
+                        Text(todo.title)
+                          .fontSize(18)
+                          .fontWeight(FontWeight.Bold)
+                          .fontColor(this.currentTheme.textColor)
+                          .decoration({
+                            type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
+                          })
+                          .opacity(todo.isCompleted ? 0.6 : 1.0)
                               .textAlign(TextAlign.Start)
-                            Text(`${todo.type} - ${todo.formatDuration()}`)
-                              .fontSize(14)
-                              .fontColor(this.currentTheme.textColor)
-                              .opacity(todo.isCompleted ? 0.4 : 0.7)
-                              .decoration({
-                                type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
-                              })
-                              .margin({ top: 4 })
+                        Text(`${todo.type} - ${todo.formatDuration()}`)
+                          .fontSize(14)
+                          .fontColor(this.currentTheme.textColor)
+                          .opacity(todo.isCompleted ? 0.4 : 0.7)
+                          .decoration({
+                            type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
+                          })
+                          .margin({ top: 4 })
                               .textAlign(TextAlign.Start)
-                          }
-                          .layoutWeight(1)
-                          .alignItems(HorizontalAlign.Start)
+                      }
+                      .layoutWeight(1)
+                      .alignItems(HorizontalAlign.Start)
 
                           // 只保留专注按钮
-                          if (!todo.isCompleted) {
-                            Button('专注')
-                              .fontSize(12)
-                              .fontColor(Color.White)
-                              .backgroundColor(this.currentTheme.primaryColor)
-                              .borderRadius(8)
-                              .height(28)
-                              .padding({ left: 8, right: 8 })
-                              .onClick(() => {
-                                const params: FocusTimerRouterParams = {
-                                  title: todo.title,
-                                  taskTitle: todo.title,
-                                  time: todo.duration * 60,
-                                  todoId: todo.id,
-                                  isSequence: false
-                                };
-                                router.pushUrl({ url: 'pages/FocusTimer', params: params })
-                                  .catch((err: Error) => {
-                                    console.error(`跳转FocusTimer出错: ${err.message}`);
-                                  });
-                              })
-                          }
+                        if (!todo.isCompleted) {
+                          Button('专注')
+                            .fontSize(12)
+                            .fontColor(Color.White)
+                            .backgroundColor(this.currentTheme.primaryColor)
+                            .borderRadius(8)
+                            .height(28)
+                            .padding({ left: 8, right: 8 })
+                            .onClick(() => {
+                              const params: FocusTimerRouterParams = {
+                                title: todo.title,
+                                taskTitle: todo.title,
+                                time: todo.duration * 60,
+                                todoId: todo.id,
+                                isSequence: false
+                              };
+                              router.pushUrl({ url: 'pages/FocusTimer', params: params })
+                                .catch((err: Error) => {
+                                  console.error(`跳转FocusTimer出错: ${err.message}`);
+                                });
+                            })
                         }
-                        .width('100%')
-                        .backgroundColor(this.currentTheme.cardBackgroundColor)
-                        .borderRadius(8)
-                        .padding(12)
-                        .opacity(todo.isCompleted ? 0.7 : 1.0)
+                    }
+                    .width('100%')
+                    .backgroundColor(this.currentTheme.cardBackgroundColor)
+                    .borderRadius(8)
+                    .padding(12)
+                    .opacity(todo.isCompleted ? 0.7 : 1.0)
                       }
                       .swipeAction({
                         end: {
@@ -869,7 +869,7 @@ struct Index {
                           }
                         }
                       })
-                    }, (todo: TodoItem) => todo.id.toString())
+                  }, (todo: TodoItem) => todo.id.toString())
                   }
                   .width('100%')
                   .divider({ strokeWidth: 0 }) // 移除分割线
