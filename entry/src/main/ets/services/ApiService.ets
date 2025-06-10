@@ -128,7 +128,7 @@ export class ApiService {
       // 初始化配置服务
       await this.configService.initialize();
       this.baseUrl = this.configService.getApiBaseUrl();
-      console.info('API Base URL:', this.baseUrl);
+      console.info('✅ API Base URL:', this.baseUrl);
 
       const context = getContext(this);
       this.preferences = await preferences.getPreferences(context, PREFERENCES_NAME);
@@ -136,7 +136,10 @@ export class ApiService {
       this.token = await this.preferences.get(TOKEN_KEY, '') as string;
       console.info('Token loaded from preferences:', this.token ? 'Token exists' : 'No token');
     } catch (error) {
-      console.error('初始化本地存储失败:', error);
+      console.error('❌ 初始化失败:', error);
+      // 设置默认API地址作为fallback
+      this.baseUrl = 'http://8.148.20.194:8080/api';
+      console.warn('⚠️ 使用默认API地址作为fallback:', this.baseUrl);
     }
   }
 
@@ -151,6 +154,13 @@ export class ApiService {
     if (this.initPromise) {
       await this.initPromise;
       this.initPromise = null;
+    }
+  }
+
+  private ensureBaseUrl() {
+    if (!this.baseUrl) {
+      this.baseUrl = 'http://8.148.20.194:8080/api';
+      console.warn('⚠️ BaseUrl为空，使用默认值:', this.baseUrl);
     }
   }
 
@@ -241,6 +251,9 @@ export class ApiService {
 
   async login(username: string, password: string): Promise<AuthResponse> {
     try {
+      await this.ensureInitialized();
+      this.ensureBaseUrl();
+      
       console.info(`尝试登录: username=${username}`);
       console.info(`请求URL: ${this.baseUrl}/auth/login`);
       const headers = await this.getHeaders();
@@ -276,6 +289,9 @@ export class ApiService {
 
   async register(username: string, password: string): Promise<AuthResponse> {
     try {
+      await this.ensureInitialized();
+      this.ensureBaseUrl();
+      
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
       let response = await httpRequest.request(
@@ -301,6 +317,9 @@ export class ApiService {
 
   async createFocusSession(sessionData: FocusSessionRequest): Promise<FocusSession> {
     try {
+      await this.ensureInitialized();
+      this.ensureBaseUrl();
+      
       console.info('发送专注会话请求:', JSON.stringify(sessionData));
       let httpRequest = http.createHttp();
       const headers = await this.getHeaders();
