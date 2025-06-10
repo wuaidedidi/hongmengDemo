@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>本地服务器测试</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        background: #007aff;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .result {
+        margin: 10px 0;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 3px;
+        font-family: monospace;
+        white-space: pre-wrap;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+      }
+      input {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        width: 200px;
+      }
+      .form-group {
+        margin: 10px 0;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🏠 本地服务器测试</h1>
+
+      <div class="section">
+        <h2>🔗 本地服务器连接</h2>
+        <p>本地地址: <strong>http://localhost:8080/api</strong></p>
+        <button onclick="testConnection()">测试连接</button>
+        <div id="connectionResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>👤 登录测试</h2>
+        <div class="form-group">
+          <label>用户名:</label>
+          <input type="text" id="username" value="大白兔" />
+        </div>
+        <div class="form-group">
+          <label>密码:</label>
+          <input type="password" id="password" value="7758258" />
+        </div>
+        <button onclick="testLogin()">本地登录测试</button>
+        <div id="loginResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>🆕 注册新用户</h2>
+        <div class="form-group">
+          <label>新用户名:</label>
+          <input type="text" id="newUsername" value="" placeholder="自动生成" />
+        </div>
+        <div class="form-group">
+          <label>新密码:</label>
+          <input type="password" id="newPassword" value="123456" />
+        </div>
+        <button onclick="testRegister()">注册新用户</button>
+        <div id="registerResult" class="result"></div>
+      </div>
+
+      <div class="section" style="background: #fff3cd">
+        <h2>📱 HarmonyOS测试说明</h2>
+        <p><strong>步骤1:</strong> 确保本地服务器启动成功（上面测试连接显示成功）</p>
+        <p><strong>步骤2:</strong> 在DevEco Studio中切换到client目录</p>
+        <p><strong>步骤3:</strong> 重新构建并运行应用</p>
+        <p><strong>步骤4:</strong> 应用现在会连接到 <code>http://10.0.2.2:8080/api</code>（模拟器访问本地）</p>
+        <p><strong>注意:</strong> 配置已切换为development模式，会自动使用本地地址</p>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE_URL = "http://localhost:8080/api";
+
+      async function testConnection() {
+        const resultDiv = document.getElementById("connectionResult");
+        resultDiv.className = "result";
+        resultDiv.textContent = "正在测试本地连接...";
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/health`, {
+            method: "GET",
+          });
+
+          if (response.ok) {
+            const data = await response.text();
+            resultDiv.className = "result success";
+            resultDiv.textContent = `✅ 本地服务器正常运行\n响应: ${data}`;
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 服务器错误: ${response.status}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 连接失败: ${error.message}\n\n请确保运行了: java -jar server/target/harmony-daily-app-0.0.1-SNAPSHOT.jar`;
+        }
+      }
+
+      async function testLogin() {
+        const resultDiv = document.getElementById("loginResult");
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+
+        resultDiv.className = "result";
+        resultDiv.textContent = `正在测试登录: ${username}...`;
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const responseText = await response.text();
+
+          if (response.ok) {
+            const data = JSON.parse(responseText);
+            resultDiv.className = "result success";
+            resultDiv.textContent = `✅ 登录成功!\nToken: ${data.token.substring(0, 30)}...\n用户名: ${data.username}`;
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 登录失败 (${response.status})\n${responseText}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 登录错误: ${error.message}`;
+        }
+      }
+
+      async function testRegister() {
+        const resultDiv = document.getElementById("registerResult");
+        let username = document.getElementById("newUsername").value;
+        const password = document.getElementById("newPassword").value;
+
+        if (!username) {
+          username = `本地用户${Date.now()}`;
+          document.getElementById("newUsername").value = username;
+        }
+
+        resultDiv.className = "result";
+        resultDiv.textContent = `正在注册: ${username}...`;
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/register`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const responseText = await response.text();
+
+          if (response.ok) {
+            const data = JSON.parse(responseText);
+            resultDiv.className = "result success";
+            resultDiv.textContent = `✅ 注册成功!\n用户名: ${data.username}\nToken: ${data.token.substring(0, 30)}...`;
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 注册失败 (${response.status})\n${responseText}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 注册错误: ${error.message}`;
+        }
+      }
+
+      // 页面加载后自动测试
+      window.onload = function () {
+        testConnection();
+      };
+    </script>
+  </body>
+</html>

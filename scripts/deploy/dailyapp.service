@@ -1,0 +1,42 @@
+[Unit]
+Description=DailyApp Spring Boot Application
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=dailyapp
+Group=dailyapp
+WorkingDirectory=/opt/dailyapp
+ExecStart=/usr/bin/java -jar -Dspring.profiles.active=prod /opt/dailyapp/serverDemo-1.0.0.jar
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# 环境变量
+Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk"
+Environment="SPRING_PROFILES_ACTIVE=prod"
+Environment="DB_USERNAME=dailyapp"
+Environment="DB_PASSWORD=dailyapp123"
+Environment="JWT_SECRET=YourVerySecureJWTSecretKeyForProductionEnvironmentThatShouldBeAtLeast256BitsLong"
+
+# 日志配置
+SyslogIdentifier=dailyapp
+StandardOutput=journal
+StandardError=journal
+
+# 安全配置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/dailyapp/data /var/log/dailyapp
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target 

@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后端API测试</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        background: #007aff;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .result {
+        margin: 10px 0;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 3px;
+        font-family: monospace;
+        white-space: pre-wrap;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+      }
+      input,
+      textarea {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+      }
+      .form-group {
+        margin: 10px 0;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>HarmonyOS后端API测试工具</h1>
+
+      <div class="section" style="background: #fff3cd; border-color: #ffeaa7">
+        <h2>⚡ 快速开始</h2>
+        <p><strong>第一步：</strong> 确保后端服务器正在运行</p>
+        <p>如果服务器未启动或需要重新编译，请在命令行中执行：</p>
+        <div style="background: #2c3e50; color: #ecf0f1; padding: 10px; border-radius: 5px; font-family: monospace">
+          <strong>方法1: 重新编译并启动（推荐）</strong><br />
+          cd serverDemo<br />
+          restart_server.bat<br /><br />
+          <strong>方法2: 直接启动（如果已编译）</strong><br />
+          cd serverDemo<br />
+          java -jar target\harmony-daily-app-0.0.1-SNAPSHOT.jar
+        </div>
+        <p><strong>第二步：</strong> 点击下面的"测试连接"按钮检查服务器状态</p>
+        <p><strong>第三步：</strong> 使用"大白兔/7758258"登录</p>
+        <p><strong>第四步：</strong> 添加测试数据</p>
+        <ul style="margin: 10px 0; padding-left: 20px">
+          <li>📝 <strong>待办事项：</strong> 点击"添加3个测试待办事项"添加基础任务</li>
+          <li>📚 <strong>待办合集：</strong> 点击"一键添加3个测试合集（含子任务）"添加学习计划、项目计划、健康计划</li>
+          <li>🔍 <strong>验证数据：</strong> 使用"获取待办事项列表"和"获取待办合集列表"查看添加的数据</li>
+        </ul>
+        <p><strong>注意：</strong> 如果遇到CORS错误，请使用方法1重新编译启动服务器</p>
+      </div>
+
+      <div class="section">
+        <h2>1. 测试服务器连接</h2>
+        <button onclick="testConnection()">测试连接</button>
+        <div id="connectionResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>2. 用户登录</h2>
+        <div class="form-group">
+          <label>用户名:</label>
+          <input type="text" id="username" value="大白兔" />
+        </div>
+        <div class="form-group">
+          <label>密码:</label>
+          <input type="password" id="password" value="7758258" />
+        </div>
+        <button onclick="login()">登录</button>
+        <div id="loginResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>3. 获取待办事项</h2>
+        <button onclick="getTodos()">获取待办事项列表</button>
+        <div id="todosResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>4. 手动添加单个待办事项（调试用）</h2>
+        <div class="form-group">
+          <label>标题:</label>
+          <input type="text" id="todoTitle" value="测试任务" />
+        </div>
+        <div class="form-group">
+          <label>描述:</label>
+          <input type="text" id="todoDescription" value="这是一个测试任务" />
+        </div>
+        <div class="form-group">
+          <label>类型:</label>
+          <input type="text" id="todoType" value="测试" />
+        </div>
+        <div class="form-group">
+          <label>时长(分钟):</label>
+          <input type="number" id="todoDuration" value="30" />
+        </div>
+        <button onclick="addSingleTodo()">添加单个待办事项</button>
+        <div id="singleTodoResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>5. 添加测试数据</h2>
+        <button onclick="addTestData()">添加3个测试待办事项</button>
+        <div id="addDataResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>6. 获取待办合集</h2>
+        <button onclick="getCollections()">获取待办合集列表</button>
+        <div id="collectionsResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>7. 手动添加待办合集（调试用）</h2>
+        <div class="form-group">
+          <label>合集标题:</label>
+          <input type="text" id="collectionTitle" value="学习计划" />
+        </div>
+        <div class="form-group">
+          <label>合集描述:</label>
+          <input type="text" id="collectionDescription" value="系统性学习HarmonyOS开发" />
+        </div>
+        <button onclick="addSingleCollection()">添加单个待办合集</button>
+        <div id="singleCollectionResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>8. 添加测试合集数据</h2>
+        <button onclick="addTestCollections()">一键添加3个测试合集（含子任务）</button>
+        <div id="addCollectionsResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>9. 数据库状态检查</h2>
+        <p>在访问H2控制台之前，先检查数据库连接和数据：</p>
+        <button onclick="checkDatabaseStatus()">检查数据库状态</button>
+        <div id="dbStatusResult" class="result"></div>
+      </div>
+
+      <div class="section">
+        <h2>10. H2数据库控制台</h2>
+        <p>直接查看数据库数据：</p>
+        <a href="http://localhost:8080/api/h2-console" target="_blank">打开H2数据库控制台</a>
+
+        <div style="background: #e7f3ff; padding: 15px; border-radius: 5px; margin: 15px 0">
+          <h4>📋 连接信息（复制粘贴即可）：</h4>
+          <ul style="font-family: monospace; font-size: 14px">
+            <li>
+              <strong>JDBC URL:</strong>
+              <code>jdbc:h2:file:E:/harmonsProject/MyTestProject/serverDemo/data/dailydb</code>
+            </li>
+            <li><strong>用户名:</strong> sa</li>
+            <li><strong>密码:</strong> (保持空白)</li>
+            <li><strong>Driver Class:</strong> org.h2.Driver</li>
+          </ul>
+        </div>
+
+        <h4>🔍 连接成功后执行的SQL查询：</h4>
+        <div
+          style="
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            border-left: 4px solid #007aff;
+          ">
+          -- 查看所有表 SHOW TABLES; -- 查看用户 SELECT * FROM users; -- 查看大白兔用户的待办事项 SELECT * FROM
+          todo_items WHERE user_id = (SELECT id FROM users WHERE username = '大白兔'); -- 查看大白兔的待办合集 SELECT *
+          FROM todo_collections WHERE user_id = (SELECT id FROM users WHERE username = '大白兔'); --
+          查看待办合集的子任务 SELECT tc.title as collection_title, tci.title as item_title, tci.description,
+          tci.duration_minutes, tci.completed FROM todo_collections tc LEFT JOIN todo_collection_items tci ON tc.id =
+          tci.collection_id WHERE tc.user_id = (SELECT id FROM users WHERE username = '大白兔') ORDER BY tc.title,
+          tci.order_index; -- 统计每个合集的子任务数量 SELECT tc.title as collection_title, COUNT(tci.id) as item_count,
+          SUM(CASE WHEN tci.completed = true THEN 1 ELSE 0 END) as completed_count FROM todo_collections tc LEFT JOIN
+          todo_collection_items tci ON tc.id = tci.collection_id WHERE tc.user_id = (SELECT id FROM users WHERE username
+          = '大白兔') GROUP BY tc.id, tc.title;
+        </div>
+
+        <p><strong>💡 提示：</strong> 如果H2控制台连接失败，说明后端服务器未启动，请先启动服务器。</p>
+      </div>
+    </div>
+
+    <script>
+      // API配置
+      const API_BASE_URL = "http://8.148.20.194:8080/api";
+      let authToken = "";
+
+      async function testConnection() {
+        const resultDiv = document.getElementById("connectionResult");
+        resultDiv.className = "result";
+        resultDiv.textContent = "正在测试连接...";
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: "HEAD",
+          });
+          if (response.ok || response.status === 405) {
+            resultDiv.className = "result success";
+            resultDiv.textContent = "✅ 服务器连接正常\n✅ 后端API服务运行中\n✅ 可以进行下一步操作";
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 服务器返回错误: ${response.status}\n请检查服务器是否正常启动`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          let errorMsg = `❌ 连接失败: ${error.message}\n\n`;
+
+          if (error.message.includes("Failed to fetch")) {
+            errorMsg += "🔧 可能的解决方案:\n";
+            errorMsg +=
+              "1. 后端服务器未启动 - 请运行: java -jar serverDemo/target/harmony-daily-app-0.0.1-SNAPSHOT.jar\n";
+            errorMsg += "2. 端口8080被占用 - 请检查其他程序是否占用此端口\n";
+            errorMsg += "3. 防火墙阻止连接 - 请检查防火墙设置\n";
+            errorMsg += "4. 网络问题 - 请检查网络连接";
+          }
+
+          resultDiv.textContent = errorMsg;
+        }
+      }
+
+      async function login() {
+        const resultDiv = document.getElementById("loginResult");
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username, password }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            authToken = data.token;
+            resultDiv.className = "result success";
+            resultDiv.textContent = `✅ 登录成功!\nToken: ${data.token.substring(0, 50)}...\n用户名: ${data.username}`;
+          } else {
+            const errorText = await response.text();
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 登录失败: ${response.status}\n${errorText}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 登录错误: ${error.message}`;
+        }
+      }
+
+      async function getTodos() {
+        const resultDiv = document.getElementById("todosResult");
+
+        if (!authToken) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ 请先登录";
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/todos`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const todos = await response.json();
+            resultDiv.className = "result success";
+            resultDiv.textContent = `✅ 获取成功！共${todos.length}个待办事项:\n\n${JSON.stringify(todos, null, 2)}`;
+          } else {
+            const errorText = await response.text();
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 获取失败: ${response.status}\n${errorText}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 请求错误: ${error.message}`;
+        }
+      }
+
+      async function addSingleTodo() {
+        const resultDiv = document.getElementById("singleTodoResult");
+        const title = document.getElementById("todoTitle").value;
+        const description = document.getElementById("todoDescription").value;
+        const type = document.getElementById("todoType").value;
+        const duration = parseInt(document.getElementById("todoDuration").value);
+
+        if (!authToken) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ 请先登录";
+          return;
+        }
+
+        const todo = {
+          title,
+          description,
+          type,
+          duration,
+          isImportant: false,
+          isUrgent: false,
+        };
+
+        resultDiv.className = "result";
+        resultDiv.textContent = "正在添加单个待办事项...";
+
+        try {
+          const response = await fetch("http://localhost:8080/api/todos", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(todo),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            resultDiv.className = "result success";
+            resultDiv.textContent = `✅ 已添加: ${data.title} (ID: ${data.id})`;
+          } else {
+            const errorText = await response.text();
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 添加失败: ${title} - ${errorText}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 添加错误: ${error.message}`;
+        }
+      }
+
+      async function addTestData() {
+        const resultDiv = document.getElementById("addDataResult");
+
+        if (!authToken) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ 请先登录";
+          return;
+        }
+
+        const testTodos = [
+          {
+            title: "学习HarmonyOS开发",
+            description: "完成第一个应用开发",
+            type: "学习",
+            duration: 120,
+            isImportant: true,
+            isUrgent: false,
+          },
+          {
+            title: "写技术博客",
+            description: "分享开发经验",
+            type: "工作",
+            duration: 60,
+            isImportant: false,
+            isUrgent: false,
+          },
+          {
+            title: "锻炼身体",
+            description: "每天跑步30分钟",
+            type: "健康",
+            duration: 30,
+            isImportant: true,
+            isUrgent: true,
+          },
+        ];
+
+        resultDiv.className = "result";
+        resultDiv.textContent = "正在添加测试数据...";
+
+        try {
+          const results = [];
+          for (const todo of testTodos) {
+            try {
+              resultDiv.textContent = `正在添加: ${todo.title}...`;
+
+              console.log("发送数据:", JSON.stringify(todo, null, 2));
+
+              const response = await fetch("http://localhost:8080/api/todos", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${authToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(todo),
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                results.push(`✅ 已添加: ${data.title} (ID: ${data.id})`);
+              } else {
+                // 获取详细的错误信息
+                let errorText;
+                try {
+                  const errorData = await response.json();
+                  errorText = errorData.message || errorData.error || response.statusText;
+                } catch {
+                  errorText = (await response.text()) || response.statusText;
+                }
+                results.push(`❌ 添加失败: ${todo.title} - ${response.status} ${errorText}`);
+                console.error("详细错误:", {
+                  status: response.status,
+                  statusText: response.statusText,
+                  error: errorText,
+                  todo: todo,
+                });
+              }
+            } catch (error) {
+              results.push(`❌ 网络错误: ${todo.title} - ${error.message}`);
+              console.error("网络错误:", error);
+            }
+          }
+
+          resultDiv.className = results.some((r) => r.includes("❌")) ? "result error" : "result success";
+          resultDiv.textContent = results.join("\n");
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 添加错误: ${error.message}`;
+        }
+      }
+
+      async function getCollections() {
+        const resultDiv = document.getElementById("collectionsResult");
+
+        if (!authToken) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ 请先登录";
+          return;
+        }
+
+        try {
+          const response = await fetch("http://localhost:8080/api/todo-collections", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const collections = await response.json();
+
+            if (collections.length === 0) {
+              resultDiv.className = "result success";
+              resultDiv.textContent = "✅ 获取成功！暂无待办合集";
+              return;
+            }
+
+            // 获取每个合集的详细信息（包括子任务）
+            let detailText = `✅ 获取成功！共${collections.length}个待办合集:\n\n`;
+
+            for (const collection of collections) {
+              try {
+                // 获取合集的子任务
+                const itemsResponse = await fetch(`http://localhost:8080/api/todo-collections/${collection.id}/items`, {
+                  method: "GET",
+                  headers: {
+                    Authorization: `Bearer ${authToken}`,
+                    "Content-Type": "application/json",
+                  },
+                });
+
+                detailText += `📚 ${collection.title} (ID: ${collection.id})\n`;
+                detailText += `   描述: ${collection.description || "无描述"}\n`;
+
+                if (itemsResponse.ok) {
+                  const items = await itemsResponse.json();
+                  if (items.length > 0) {
+                    detailText += `   子任务(${items.length}个):\n`;
+                    items.forEach((item, index) => {
+                      const status = item.completed ? "✅" : "⭕";
+                      detailText += `   ${index + 1}. ${status} ${item.title} (${item.durationMinutes}分钟)\n`;
+                      if (item.description) {
+                        detailText += `      └─ ${item.description}\n`;
+                      }
+                    });
+                  } else {
+                    detailText += `   子任务: 暂无\n`;
+                  }
+                } else {
+                  detailText += `   子任务: 获取失败\n`;
+                }
+                detailText += `\n`;
+              } catch (error) {
+                detailText += `   子任务: 获取出错 - ${error.message}\n\n`;
+              }
+            }
+
+            resultDiv.className = "result success";
+            resultDiv.textContent = detailText;
+          } else {
+            const errorText = await response.text();
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 获取失败: ${response.status}\n${errorText}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 请求错误: ${error.message}`;
+        }
+      }
+
+      async function addSingleCollection() {
+        const resultDiv = document.getElementById("singleCollectionResult");
+        const title = document.getElementById("collectionTitle").value;
+        const description = document.getElementById("collectionDescription").value;
+
+        if (!authToken) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ 请先登录";
+          return;
+        }
+
+        const collection = {
+          title,
+          description,
+        };
+
+        resultDiv.className = "result";
+        resultDiv.textContent = "正在添加单个待办合集...";
+
+        try {
+          const response = await fetch("http://localhost:8080/api/todo-collections", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(collection),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            resultDiv.className = "result success";
+            resultDiv.textContent = `✅ 已添加: ${data.title} (ID: ${data.id})`;
+          } else {
+            const errorText = await response.text();
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ 添加失败: ${title} - ${errorText}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 添加错误: ${error.message}`;
+        }
+      }
+
+      async function addTestCollections() {
+        const resultDiv = document.getElementById("addCollectionsResult");
+
+        if (!authToken) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ 请先登录";
+          return;
+        }
+
+        // 定义测试合集及其子任务
+        const testCollectionsData = [
+          {
+            collection: {
+              title: "HarmonyOS学习计划",
+              description: "系统性学习HarmonyOS开发技术栈",
+            },
+            items: [
+              { title: "环境搭建", description: "安装DevEco Studio和配置开发环境", durationMinutes: 30, orderIndex: 1 },
+              { title: "ArkTS基础语法", description: "学习TypeScript和ArkTS语法", durationMinutes: 60, orderIndex: 2 },
+              { title: "组件化开发", description: "掌握自定义组件开发", durationMinutes: 90, orderIndex: 3 },
+              { title: "状态管理", description: "学习@State、@Prop等状态管理", durationMinutes: 45, orderIndex: 4 },
+              { title: "网络请求", description: "HTTP模块和数据获取", durationMinutes: 60, orderIndex: 5 },
+            ],
+          },
+          {
+            collection: {
+              title: "项目开发计划",
+              description: "完成待办事项应用的完整开发",
+            },
+            items: [
+              { title: "需求分析", description: "梳理应用功能需求", durationMinutes: 30, orderIndex: 1 },
+              { title: "UI设计", description: "设计用户界面和交互流程", durationMinutes: 45, orderIndex: 2 },
+              { title: "前端开发", description: "实现HarmonyOS前端页面", durationMinutes: 180, orderIndex: 3 },
+              { title: "后端对接", description: "集成Spring Boot后端API", durationMinutes: 60, orderIndex: 4 },
+              { title: "测试调试", description: "功能测试和bug修复", durationMinutes: 90, orderIndex: 5 },
+            ],
+          },
+          {
+            collection: {
+              title: "健康作息计划",
+              description: "保持健康的工作和生活节奏",
+            },
+            items: [
+              { title: "晨练", description: "每天早上30分钟运动", durationMinutes: 30, orderIndex: 1 },
+              { title: "专注工作", description: "使用番茄工作法集中注意力", durationMinutes: 120, orderIndex: 2 },
+              { title: "午休", description: "短时间休息恢复精力", durationMinutes: 20, orderIndex: 3 },
+              { title: "晚间学习", description: "技术学习和总结", durationMinutes: 60, orderIndex: 4 },
+              { title: "睡前放松", description: "阅读或冥想", durationMinutes: 30, orderIndex: 5 },
+            ],
+          },
+        ];
+
+        resultDiv.className = "result";
+        resultDiv.textContent = "正在添加测试合集数据...";
+
+        try {
+          const results = [];
+
+          for (const collectionData of testCollectionsData) {
+            try {
+              // 1. 创建合集
+              resultDiv.textContent = `正在添加合集: ${collectionData.collection.title}...`;
+
+              console.log("发送合集数据:", JSON.stringify(collectionData.collection, null, 2));
+
+              const collectionResponse = await fetch("http://localhost:8080/api/todo-collections", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${authToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(collectionData.collection),
+              });
+
+              if (collectionResponse.ok) {
+                const collection = await collectionResponse.json();
+                results.push(`✅ 已添加合集: ${collection.title} (ID: ${collection.id})`);
+
+                // 2. 为合集添加子任务
+                let itemCount = 0;
+                for (const item of collectionData.items) {
+                  try {
+                    resultDiv.textContent = `正在为"${collection.title}"添加子任务: ${item.title}...`;
+
+                    const itemResponse = await fetch(
+                      `http://localhost:8080/api/todo-collections/${collection.id}/items`,
+                      {
+                        method: "POST",
+                        headers: {
+                          Authorization: `Bearer ${authToken}`,
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(item),
+                      }
+                    );
+
+                    if (itemResponse.ok) {
+                      const itemData = await itemResponse.json();
+                      itemCount++;
+                      console.log(`子任务添加成功: ${itemData.title}`);
+                    } else {
+                      const errorText = await itemResponse.text();
+                      results.push(`⚠️ 子任务添加失败: ${item.title} - ${errorText}`);
+                    }
+                  } catch (error) {
+                    results.push(`⚠️ 子任务网络错误: ${item.title} - ${error.message}`);
+                  }
+                }
+
+                results.push(`  └─ 成功添加 ${itemCount}/${collectionData.items.length} 个子任务`);
+              } else {
+                // 获取详细的错误信息
+                let errorText;
+                try {
+                  const errorData = await collectionResponse.json();
+                  errorText = errorData.message || errorData.error || collectionResponse.statusText;
+                } catch {
+                  errorText = (await collectionResponse.text()) || collectionResponse.statusText;
+                }
+                results.push(
+                  `❌ 合集添加失败: ${collectionData.collection.title} - ${collectionResponse.status} ${errorText}`
+                );
+                console.error("详细错误:", {
+                  status: collectionResponse.status,
+                  statusText: collectionResponse.statusText,
+                  error: errorText,
+                  collection: collectionData.collection,
+                });
+              }
+            } catch (error) {
+              results.push(`❌ 网络错误: ${collectionData.collection.title} - ${error.message}`);
+              console.error("网络错误:", error);
+            }
+          }
+
+          resultDiv.className = results.some((r) => r.includes("❌")) ? "result error" : "result success";
+          resultDiv.textContent = results.join("\n");
+
+          // 完成后自动刷新合集列表
+          setTimeout(() => {
+            getCollections();
+          }, 1000);
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 添加错误: ${error.message}`;
+        }
+      }
+
+      async function checkDatabaseStatus() {
+        const resultDiv = document.getElementById("dbStatusResult");
+        resultDiv.className = "result";
+        resultDiv.textContent = "正在检查数据库状态...";
+
+        if (!authToken) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ 请先登录获取token";
+          return;
+        }
+
+        try {
+          // 检查用户登录状态
+          resultDiv.textContent = "1. 检查用户登录状态...";
+
+          // 检查待办事项
+          const todosResponse = await fetch("http://localhost:8080/api/todos", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          // 检查待办合集
+          const collectionsResponse = await fetch("http://localhost:8080/api/todo-collections", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          let statusReport = "";
+
+          if (todosResponse.ok) {
+            const todos = await todosResponse.json();
+            statusReport += `✅ 待办事项连接正常 - 共${todos.length}条记录\n`;
+            if (todos.length > 0) {
+              statusReport += `最新待办: "${todos[0].title}"\n`;
+            }
+          } else {
+            statusReport += `❌ 待办事项查询失败: ${todosResponse.status}\n`;
+          }
+
+          if (collectionsResponse.ok) {
+            const collections = await collectionsResponse.json();
+            statusReport += `✅ 待办合集连接正常 - 共${collections.length}条记录\n`;
+          } else {
+            statusReport += `❌ 待办合集查询失败: ${collectionsResponse.status}\n`;
+          }
+
+          statusReport += "\n📊 数据库状态总结:\n";
+          statusReport += `- 数据库文件: E:/harmonsProject/MyTestProject/serverDemo/data/dailydb.mv.db\n`;
+          statusReport += `- 服务器状态: 正常运行\n`;
+          statusReport += `- 用户认证: 已通过\n`;
+
+          resultDiv.className = "result success";
+          resultDiv.textContent = statusReport;
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ 数据库状态检查失败: ${error.message}`;
+        }
+      }
+    </script>
+  </body>
+</html>
