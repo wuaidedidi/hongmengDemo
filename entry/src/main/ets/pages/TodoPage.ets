@@ -1,4 +1,4 @@
-import { AddTodoCollectionDialog } from '../components/AddTodoCollectionDialog';
+import { AddCollectionDialog } from '../components/dialogs/TodoDialogs';
 import { AddSubTodoDialog } from '../components/AddSubTodoDialog';
 import { TabBar } from '../components/TabBar';
 import { ThemeService, ThemeConfig, DEFAULT_THEME_CONFIG } from '../services/ThemeService';
@@ -17,10 +17,7 @@ import { FocusTimerParams } from '../models/FocusTimerParams';
 import { BusinessError } from '@ohos.base';
 
 // 用于对话框的简单接口
-interface DialogData {
-  title: string;
-  description?: string;
-}
+
 
 // 滑动操作相关接口
 interface SwipeActionBuilder {
@@ -70,6 +67,8 @@ struct TodoPage {
       console.error('加载主题失败:', error);
     }
     await this.loadTodoCollections();
+    // 默认展开所有合集，提升用户体验
+    await this.expandAllCollections();
   }
 
   aboutToDisappear() {
@@ -78,8 +77,8 @@ struct TodoPage {
 
   async onPageShow(): Promise<void> {
     await this.loadTodoCollections();
-    // 确保重新加载已展开合集的子待办数据
-    await this.reloadExpandedCollections();
+    // 默认展开所有合集，包括新创建的
+    await this.expandAllCollections();
   }
 
   // 加载待办合集
@@ -93,6 +92,28 @@ struct TodoPage {
       promptAction.showToast(new ToastOptions('加载待办合集失败'));
     } finally {
       this.isLoadingCollections = false;
+    }
+  }
+
+  // 默认展开所有合集，提升用户体验
+  async expandAllCollections(): Promise<void> {
+    if (this.todoCollections.length === 0) return;
+    
+    console.info('默认展开所有合集，提升用户体验');
+    
+    // 展开所有合集
+    for (let collection of this.todoCollections) {
+      this.expandedCollections.add(collection.id);
+    }
+    this.expandedCollections = new Set(this.expandedCollections);
+    
+    // 加载所有合集的子任务
+    for (let collection of this.todoCollections) {
+      try {
+        await this.loadCollectionItems(collection.id);
+      } catch (error) {
+        console.error(`自动加载合集${collection.id}的子任务失败:`, error);
+      }
     }
   }
 
@@ -165,6 +186,15 @@ struct TodoPage {
       const response = await this.apiService.createTodoCollectionDirect(title, description);
       this.todoCollections.push(response);
       this.todoCollections = Array.from(this.todoCollections);
+      
+      // 自动展开新创建的合集，提升用户体验
+      this.expandedCollections.add(response.id);
+      this.expandedCollections = new Set(this.expandedCollections);
+      
+      // 初始化新合集的子任务列表为空数组
+      this.collectionItems.set(response.id, []);
+      this.collectionItems = new Map(this.collectionItems);
+      
       promptAction.showToast(new ToastOptions('待办合集创建成功'));
     } catch (error) {
       console.error('创建待办合集失败:', error);
@@ -608,10 +638,10 @@ struct TodoPage {
       
       // 每次打开时重新创建，确保获取最新主题
       this.addTodoCollectionDialogController = new CustomDialogController({
-        builder: AddTodoCollectionDialog({
+        builder: AddCollectionDialog({
           currentTheme: currentTheme, // 传递当前主题
-          onConfirm: (data: DialogData) => {
-            this.createTodoCollectionWithParams(data.title, data.description);
+          onConfirm: (title: string, description?: string) => {
+            this.createTodoCollectionWithParams(title, description);
           }
         }),
         autoCancel: true,

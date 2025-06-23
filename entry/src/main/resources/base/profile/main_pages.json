@@ -1,7 +1,6 @@
 {
   "src": [
     "pages/Index",
-    "pages/Second",
     "pages/TodoDetail",
     "pages/TodoPage",
     "pages/LockPage",

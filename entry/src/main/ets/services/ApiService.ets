@@ -1,124 +1,205 @@
+/**
+ * 🌐 API服务类 (ApiService)
+ * 
+ * 这是应用与后端服务通信的核心类，负责处理所有的HTTP请求
+ * 采用单例模式，确保全局只有一个API服务实例
+ * 
+ * 🔥 核心功能：
+ * - 用户认证管理（登录、注册、Token管理）
+ * - 待办事项CRUD操作
+ * - 专注会话管理
+ * - 统计数据获取
+ * - 自动错误处理和重试机制
+ * 
+ * 🏗️ 架构特点：
+ * - 单例模式：全局统一的API服务实例
+ * - JWT认证：自动处理Token认证
+ * - 配置灵活：支持多环境配置
+ * - 数据持久化：本地存储用户信息
+ */
+
 import http from '@ohos.net.http';
 import promptAction from '@ohos.promptAction';
 import preferences from '@ohos.data.preferences';
 import { ConfigService } from './ConfigService';
 
-// const BASE_URL = 'http://10.0.2.2:8080/api'; // 移除硬编码
-const PREFERENCES_NAME = 'dailyapp_preferences';
-const TOKEN_KEY = 'auth_token';
-const USERNAME_KEY = 'username';
+// 🔧 配置常量
+// const BASE_URL = 'http://10.0.2.2:8080/api'; // 移除硬编码，改为动态配置
+const PREFERENCES_NAME = 'dailyapp_preferences'; // 本地存储配置名称
+const TOKEN_KEY = 'auth_token';                  // Token存储键
+const USERNAME_KEY = 'username';                 // 用户名存储键
 
-// 定义接口类型
+// 🔗 API接口类型定义
+// 这些接口定义了与后端交互的数据结构
+
+/**
+ * 👤 用户认证响应接口
+ */
 interface AuthResponse {
-  token: string;
-  username: string;
+  token: string;    // JWT认证令牌
+  username: string; // 用户名
 }
 
+/**
+ * ⏰ 专注会话请求接口
+ */
 interface FocusSessionRequest {
-  durationMinutes: number;
-  startTime: string;
-  endTime: string;
-  taskDescription: string;
+  durationMinutes: number;  // 专注时长（分钟）
+  startTime: string;        // 开始时间
+  endTime: string;          // 结束时间
+  taskDescription: string;  // 任务描述
 }
 
+/**
+ * 📊 专注会话数据接口
+ */
 interface FocusSession {
-  id: number;
-  userId: number;
-  duration: number;
-  startTime: string;
-  endTime: string;
-  type: string;
+  id: number;        // 会话ID
+  userId: number;    // 用户ID
+  duration: number;  // 持续时长
+  startTime: string; // 开始时间
+  endTime: string;   // 结束时间
+  type: string;      // 会话类型
 }
 
+/**
+ * ❌ 错误响应接口
+ */
 interface ErrorResponse {
-  message?: string;
-  error?: string;
+  message?: string; // 错误消息
+  error?: string;   // 错误详情
 }
 
+/**
+ * ✅ 签到数据接口
+ */
 interface CheckIn {
-  id: number;
-  userId: number;
-  checkInTime: string;
-  streakCount: number;
+  id: number;           // 签到ID
+  userId: number;       // 用户ID
+  checkInTime: string;  // 签到时间
+  streakCount: number;  // 连续签到天数
 }
 
+/**
+ * 📈 统计数据响应接口
+ */
 export interface StatisticsResponse {
-  totalFocusTime: number;
-  totalFocusCount: number;
-  continuousDays: number;
-  totalDays: number;
-  todayFocusTime: number;
-  weeklyFocusTime: number;
-  monthlyFocusTime: number;
-  currentStreak: number;
+  totalFocusTime: number;   // 总专注时长
+  totalFocusCount: number;  // 总专注次数
+  continuousDays: number;   // 连续天数
+  totalDays: number;        // 总天数
+  todayFocusTime: number;   // 今日专注时长
+  weeklyFocusTime: number;  // 本周专注时长
+  monthlyFocusTime: number; // 本月专注时长
+  currentStreak: number;    // 当前连击数
 }
 
-// 添加Todo相关接口
+// 📝 待办事项相关接口定义
+
+/**
+ * 待办事项创建/更新请求接口
+ */
 export interface TodoItemRequest {
-  title: string;
-  description?: string;
-  type: string;
-  duration: number;
-  isImportant?: boolean;
-  isUrgent?: boolean;
+  title: string;          // 待办标题（必填）
+  description?: string;   // 待办描述（可选）
+  type: string;          // 待办分类
+  duration: number;      // 预计时长（分钟）
+  isImportant?: boolean; // 是否重要
+  isUrgent?: boolean;    // 是否紧急
 }
 
+/**
+ * 待办事项完整数据接口
+ */
 export interface TodoItem {
-  id: number;
-  title: string;
-  description?: string;
-  type: string;
-  duration: number;
-  completed: boolean;
-  isImportant: boolean;
-  isUrgent: boolean;
-  createdAt: string;
-  updatedAt?: string;
-  userId: number;
-  focusTime?: number;
-  completedTime?: string;
+  id: number;              // 待办ID
+  title: string;           // 待办标题
+  description?: string;    // 待办描述
+  type: string;           // 待办分类
+  duration: number;       // 预计时长
+  completed: boolean;     // 完成状态
+  isImportant: boolean;   // 重要性标记
+  isUrgent: boolean;      // 紧急性标记
+  createdAt: string;      // 创建时间
+  updatedAt?: string;     // 更新时间
+  userId: number;         // 所属用户ID
+  focusTime?: number;     // 实际专注时长
+  completedTime?: string; // 完成时间
 }
 
+/**
+ * 📋 待办合集接口
+ */
 export interface TodoCollection {
-  id: number;
-  title: string;
-  description?: string;
-  createdAt: string;
-  updatedAt?: string;
-  userId: number;
+  id: number;           // 合集ID
+  title: string;        // 合集标题
+  description?: string; // 合集描述
+  createdAt: string;    // 创建时间
+  updatedAt?: string;   // 更新时间
+  userId: number;       // 所属用户ID
 }
 
+/**
+ * 📑 待办合集子项接口
+ */
 export interface TodoCollectionItem {
-  id: number;
-  title: string;
-  description?: string;
-  isCompleted: boolean;
-  orderIndex: number;
-  collectionId: number;
-  createTime: string;
-  durationMinutes?: number;
+  id: number;               // 子项ID
+  title: string;            // 子项标题
+  description?: string;     // 子项描述
+  isCompleted: boolean;     // 完成状态
+  orderIndex: number;       // 排序索引
+  collectionId: number;     // 所属合集ID
+  createTime: string;       // 创建时间
+  durationMinutes?: number; // 预计时长
 }
 
+/**
+ * 待办合集创建请求接口
+ */
 export interface TodoCollectionRequest {
-  title: string;
-  description?: string;
+  title: string;        // 合集标题
+  description?: string; // 合集描述
 }
 
+/**
+ * 待办合集子项创建请求接口
+ */
 export interface TodoCollectionItemRequest {
-  title: string;
-  description?: string;
-  durationMinutes?: number;
-  orderIndex?: number;
+  title: string;            // 子项标题
+  description?: string;     // 子项描述
+  durationMinutes?: number; // 预计时长
+  orderIndex?: number;      // 排序索引
 }
 
+/**
+ * 🌐 API服务类 - 核心网络通信服务
+ * 
+ * 采用单例模式设计，确保全应用只有一个API服务实例
+ * 负责处理所有与后端的HTTP通信
+ */
 export class ApiService {
+  /** 单例实例 */
   private static instance: ApiService;
+  
+  /** JWT认证令牌 */
   private token: string = '';
+  
+  /** 本地存储服务 */
   private preferences: preferences.Preferences | null = null;
+  
+  /** 初始化Promise，确保服务完全初始化后再使用 */
   private initPromise: Promise<void> | null = null;
+  
+  /** 配置服务实例 */
   private configService: ConfigService = ConfigService.getInstance();
+  
+  /** API基础URL */
   private baseUrl: string = '';
 
+  /**
+   * 私有构造函数 - 实现单例模式
+   * 在构造时启动异步初始化过程
+   */
   private constructor() {
     this.initPromise = this.initPreferences();
   }
