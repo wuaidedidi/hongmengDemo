@@ -2,7 +2,67 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#000000"
+      "value": "#0A0F1C"
+    },
+    {
+      "name": "glass_background_primary",
+      "value": "#1A1F2E"
+    },
+    {
+      "name": "glass_background_secondary",
+      "value": "#252A3B"
+    },
+    {
+      "name": "glass_surface_light",
+      "value": "#FFFFFF08"
+    },
+    {
+      "name": "glass_surface_medium",
+      "value": "#FFFFFF12"
+    },
+    {
+      "name": "glass_surface_strong",
+      "value": "#FFFFFF20"
+    },
+    {
+      "name": "glass_border_light",
+      "value": "#FFFFFF15"
+    },
+    {
+      "name": "glass_border_medium",
+      "value": "#FFFFFF25"
+    },
+    {
+      "name": "neon_blue",
+      "value": "#00D4FF"
+    },
+    {
+      "name": "neon_purple",
+      "value": "#9D4EDD"
+    },
+    {
+      "name": "neon_pink",
+      "value": "#FF006E"
+    },
+    {
+      "name": "neon_green",
+      "value": "#39FF14"
+    },
+    {
+      "name": "neon_orange",
+      "value": "#FF8500"
+    },
+    {
+      "name": "text_primary",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#FFFFFF70"
+    },
+    {
+      "name": "text_tertiary",
+      "value": "#FFFFFF50"
     }
   ]
 }

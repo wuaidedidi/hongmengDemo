@@ -2,7 +2,135 @@
   "color": [
     {
       "name": "start_window_background",
+      "value": "#0A0F1C"
+    },
+    {
+      "name": "glass_background_primary",
+      "value": "#1A1F2E"
+    },
+    {
+      "name": "glass_background_secondary",
+      "value": "#252A3B"
+    },
+    {
+      "name": "glass_surface_light",
+      "value": "#FFFFFF12"
+    },
+    {
+      "name": "glass_surface_medium",
+      "value": "#FFFFFF1A"
+    },
+    {
+      "name": "glass_surface_strong",
+      "value": "#FFFFFF25"
+    },
+    {
+      "name": "glass_border_light",
+      "value": "#FFFFFF20"
+    },
+    {
+      "name": "glass_border_medium",
+      "value": "#FFFFFF30"
+    },
+    {
+      "name": "neon_blue",
+      "value": "#00D4FF"
+    },
+    {
+      "name": "neon_blue_20",
+      "value": "#00D4FF33"
+    },
+    {
+      "name": "neon_blue_30",
+      "value": "#00D4FF4D"
+    },
+    {
+      "name": "neon_blue_40",
+      "value": "#00D4FF66"
+    },
+    {
+      "name": "neon_blue_60",
+      "value": "#00D4FF99"
+    },
+    {
+      "name": "neon_purple",
+      "value": "#9D4EDD"
+    },
+    {
+      "name": "neon_purple_20",
+      "value": "#9D4EDD33"
+    },
+    {
+      "name": "neon_purple_40",
+      "value": "#9D4EDD66"
+    },
+    {
+      "name": "neon_pink",
+      "value": "#FF006E"
+    },
+    {
+      "name": "neon_pink_40",
+      "value": "#FF006E66"
+    },
+    {
+      "name": "neon_green",
+      "value": "#39FF14"
+    },
+    {
+      "name": "neon_orange",
+      "value": "#FF8500"
+    },
+    {
+      "name": "gradient_primary_start",
+      "value": "#667EEA"
+    },
+    {
+      "name": "gradient_primary_end",
+      "value": "#764BA2"
+    },
+    {
+      "name": "gradient_secondary_start",
+      "value": "#FF6B6B"
+    },
+    {
+      "name": "gradient_secondary_end",
+      "value": "#FFE66D"
+    },
+    {
+      "name": "gradient_accent_start",
+      "value": "#4ECDC4"
+    },
+    {
+      "name": "gradient_accent_end",
+      "value": "#44A08D"
+    },
+    {
+      "name": "text_primary",
       "value": "#FFFFFF"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#FFFFFF80"
+    },
+    {
+      "name": "text_tertiary",
+      "value": "#FFFFFF60"
+    },
+    {
+      "name": "shadow_soft",
+      "value": "#00000020"
+    },
+    {
+      "name": "shadow_medium",
+      "value": "#00000040"
+    },
+    {
+      "name": "shadow_strong",
+      "value": "#00000060"
+    },
+    {
+      "name": "blur_overlay",
+      "value": "#0A0F1C80"
     }
   ]
 }

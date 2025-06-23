@@ -1,6 +1,6 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
-import { ThemeService, ThemeConfig } from '../services/ThemeService';
+import { ThemeService, ThemeConfig, DEFAULT_THEME_CONFIG } from '../services/ThemeService';
 
 interface TabItem {
   icon: string;
@@ -12,21 +12,15 @@ interface TabItem {
 export struct TabBar {
   @Prop currentIndex: number = 0;
   @Prop isLocked?: boolean = false;  // 添加锁机状态属性
-  @State currentTheme: ThemeConfig = {
-    id: 'light',
-    name: '浅色主题',
-    primaryColor: '#007AFF',
-    backgroundColor: '#FFFFFF',
-    textColor: '#000000',
-    cardBackgroundColor: '#F8F8F8',
-    borderColor: '#E0E0E0',
-    shadowColor: 'rgba(0, 0, 0, 0.1)',
-    errorColor: '#FF3B30'
-  };
+  @State currentTheme: ThemeConfig = DEFAULT_THEME_CONFIG;
 
   private themeService: ThemeService = ThemeService.getInstance();
-  private themeChangeListener = (theme: ThemeConfig) => {
-    this.currentTheme = theme;
+  private themeChangeListener = async () => {
+    try {
+      this.currentTheme = await this.themeService.getCurrentTheme();
+    } catch (error) {
+      console.error('TabBar主题更新失败:', error);
+    }
   };
 
   private tabs: TabItem[] = [

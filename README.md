@@ -18,9 +18,6 @@ MyTestProject/
 │   ├── target/           # 编译输出
 │   └── data/             # 数据库文件
 ├── scripts/                # 脚本管理
-│   ├── build/             # 构建脚本
-│   │   ├── build-and-deploy.sh
-│   │   └── build-and-deploy.bat
 │   ├── test/              # 测试脚本
 │   │   ├── add_test_data.ps1
 │   │   ├── test_api.bat
@@ -33,11 +30,12 @@ MyTestProject/
 │   └── ...
 ├── docs/                   # 文档
 │   ├── 部署指南.md
-│   └── requirements.md
+│   ├── requirements.md
+│   └── ...
 └── data/                   # 数据文件
 ```
 
-> **重要变更**: HarmonyOS 前端项目现已移至根目录，使 DevEco Studio 能够正确识别项目结构并支持内置的 Git 功能。
+> **重要说明**: HarmonyOS 前端项目位于根目录，使 DevEco Studio 能够正确识别项目结构并支持内置的 Git 功能。
 
 ## 🚀 快速开始
 
@@ -59,10 +57,10 @@ mvn spring-boot:run
 
 ```bash
 # Linux/Mac
-./scripts/build/build-and-deploy.sh
+./build_and_deploy.sh
 
 # Windows
-scripts\build\build-and-deploy.bat
+build_and_deploy.bat
 ```
 
 ### 测试
@@ -91,9 +89,8 @@ scripts\test\add_test_data.ps1
 
 1. **前端代码**位于项目根目录 (HarmonyOS 项目结构)
 2. **后端代码**位于 `server/` 目录
-3. **构建脚本**位于 `scripts/build/` 目录
-4. **测试工具**位于 `scripts/test/` 和 `tests/` 目录
-5. **部署配置**位于 `scripts/deploy/` 目录
+3. **测试工具**位于 `scripts/test/` 和 `tests/` 目录
+4. **部署配置**位于 `scripts/deploy/` 目录
 
 ### 使用 DevEco Studio
 
@@ -103,7 +100,49 @@ scripts\test\add_test_data.ps1
 
 ## 🔧 环境要求
 
-- Java 17+
+- Java 8+
 - Maven 3.6+
 - DevEco Studio (HarmonyOS 开发)
-- Node.js (可选，用于某些构建工具)
+
+## 🚀 部署
+
+### 本地部署
+
+```bash
+# 1. 构建后端
+cd server
+mvn clean package
+
+# 2. 启动服务
+java -jar target/harmony-daily-app-0.0.1-SNAPSHOT.jar
+
+# 3. 验证部署
+curl http://localhost:8080/api/health
+```
+
+### 服务器部署
+
+```bash
+# 使用提供的部署脚本
+./deploy_to_server.sh
+```
+
+## 📊 健康检查
+
+```bash
+# 应用健康状态
+curl http://localhost:8080/api/health
+
+# API测试
+curl http://localhost:8080/api/todos
+```
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+## 🆘 获取帮助
+
+- 📚 [完整文档](docs/)
+- 🐛 问题反馈请提交 Issue
+- 📧 联系开发者

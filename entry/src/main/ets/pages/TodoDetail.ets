@@ -7,7 +7,7 @@ import type Want from '@ohos.app.ability.Want';
 import { TodoCollection, TodoItem, TodoStatus } from '../model/TodoTypes';
 import { mockCollections } from '../model/MockData';
 import { TabBar } from '../components/TabBar';
-import { ThemeService, ThemeConfig } from '../services/ThemeService';
+import { ThemeService, ThemeConfig, DEFAULT_THEME_CONFIG } from '../services/ThemeService';
 
 // FocusTimer页面路由参数定义 (根据TodoDetail的需求调整)
 interface FocusTimerRouterParams {
@@ -89,40 +89,95 @@ interface TodoItemDisplay {
 struct AddTodoDialog {
   @State newTodoTitle: string = '';
   @State newTodoDuration: number = 15;
+  @Prop currentTheme: ThemeConfig; // 添加主题属性
   controller: CustomDialogController;
   onConfirm: (title: string, duration: number) => void = () => {
   };
 
   build() {
     Column() {
-      Text('添加待办')
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 10, bottom: 10 })
-      
-      TextInput({ placeholder: '请输入待办标题' })
-        .width('90%')
-        .height(40)
-        .margin({ top: 16 })
-        .onChange((value: string) => {
-          this.newTodoTitle = value;
-        })
-      
-      TextInput({ placeholder: '请输入时长（分钟）' })
-        .width('90%')
-        .height(40)
-        .margin({ top: 16 })
-        .type(InputType.Number)
-        .onChange((value: string) => {
-          this.newTodoDuration = parseInt(value) || 15;
-        })
-      
-      Row() {
+      // 标题区域
+      Column() {
+        Text('📋')
+          .fontSize(32)
+          .margin({ bottom: 8 })
+        Text('添加待办')
+          .fontSize(20)
+          .fontColor(this.currentTheme.textColor)
+          .fontWeight(FontWeight.Bold)
+      }
+      .alignItems(HorizontalAlign.Center)
+      .margin({ bottom: 24 })
+
+      // 输入区域
+      Column({ space: 16 }) {
+        TextInput({ placeholder: '请输入待办标题' })
+          .onChange((value: string) => {
+            this.newTodoTitle = value;
+          })
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'D0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '50' 
+          })
+          .fontColor(this.currentTheme.textColor)
+          .placeholderColor(this.currentTheme.textColor + '80')
+          .padding(16)
+          .backdropBlur(8)
+          .shadow({
+            radius: 6,
+            color: this.currentTheme.glassmorphism.accentPrimary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+
+        TextInput({ placeholder: '请输入时长（分钟）' })
+          .type(InputType.Number)
+          .onChange((value: string) => {
+            this.newTodoDuration = parseInt(value) || 15;
+          })
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'D0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '50' 
+          })
+          .fontColor(this.currentTheme.textColor)
+          .placeholderColor(this.currentTheme.textColor + '80')
+          .padding(16)
+          .backdropBlur(8)
+          .shadow({
+            radius: 6,
+            color: this.currentTheme.glassmorphism.accentPrimary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+      }
+      .margin({ bottom: 24 })
+
+      // 按钮区域
+      Row({ space: 12 }) {
         Button('取消')
           .onClick(() => {
             this.controller.close();
           })
-          .margin({ right: 10 })
+          .layoutWeight(1)
+          .height(48)
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'B0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '60' 
+          })
+          .fontColor(this.currentTheme.glassmorphism.accentSecondary)
+          .backdropBlur(8)
+          .shadow({
+            radius: 8,
+            color: this.currentTheme.glassmorphism.accentSecondary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
         
         Button('确定')
           .onClick(() => {
@@ -133,96 +188,313 @@ struct AddTodoDialog {
             this.onConfirm(this.newTodoTitle, this.newTodoDuration);
             this.controller.close();
           })
+          .layoutWeight(1)
+          .height(48)
+          .linearGradient({
+            angle: 135,
+            colors: [
+              [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+              [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+            ]
+          })
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentPrimary + '60' 
+          })
+          .fontColor('#FFFFFF')
+          .backdropBlur(8)
+          .shadow({
+            radius: 12,
+            color: this.currentTheme.glassmorphism.accentPrimary + '50',
+            offsetX: 0,
+            offsetY: 3
+          })
+          .blur(0.2)
       }
-      .margin({ top: 20, bottom: 10 })
+      .width('100%')
     }
-    .width('80%')
-    .padding(20)
+    .padding(24)
+    .width(320)
+    .backgroundColor(this.currentTheme.backgroundColor + 'F8')
+    .borderRadius(24)
+    .backdropBlur(15)
+    .border({ 
+      width: 0.5, 
+      color: this.currentTheme.glassmorphism.accentPrimary + '40' 
+    })
+    .shadow({
+      radius: 25,
+      color: this.currentTheme.glassmorphism.accentPrimary + '30',
+      offsetX: 0,
+      offsetY: 10
+    })
+    .linearGradient({
+      angle: 135,
+      colors: [
+        [this.currentTheme.backgroundColor + 'F5', 0.0],
+        [this.currentTheme.glassmorphism.surfaceLight + 'F8', 1.0]
+      ]
+    })
   }
 }
 
 @CustomDialog
 struct AddCollectionDialog {
   @Link newCollectionTitle: string; // 绑定到 TodoDetail 页面的 @State
+  @Prop currentTheme: ThemeConfig; // 添加主题属性
   onConfirm: () => void = () => {
   };
   controller?: CustomDialogController;
 
   build() {
     Column() {
-      Text("添加新待办合集").fontSize(20).fontWeight(FontWeight.Bold).margin({ bottom: 20 })
+      // 标题区域
+      Column() {
+        Text('📂')
+          .fontSize(32)
+          .margin({ bottom: 8 })
+        Text('添加新待办合集')
+          .fontSize(20)
+          .fontColor(this.currentTheme.textColor)
+          .fontWeight(FontWeight.Bold)
+      }
+      .alignItems(HorizontalAlign.Center)
+      .margin({ bottom: 24 })
+
+      // 输入区域
       TextInput({ placeholder: "合集名称", text: this.newCollectionTitle })
         .onChange(val => {
           this.newCollectionTitle = val;
         })
-        .margin({ bottom: 20 })
-      Row({ space: 10 }) {
-        Button("取消").onClick(() => {
-          if (this.controller) {
-            this.controller.close();
-          }
-        }).layoutWeight(1)
-        Button("确定").onClick(() => {
+        .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'D0')
+        .borderRadius(16)
+        .border({ 
+          width: 0.5, 
+          color: this.currentTheme.glassmorphism.accentSecondary + '50' 
+        })
+        .fontColor(this.currentTheme.textColor)
+        .placeholderColor(this.currentTheme.textColor + '80')
+        .padding(16)
+        .backdropBlur(8)
+        .shadow({
+          radius: 6,
+          color: this.currentTheme.glassmorphism.accentPrimary + '20',
+          offsetX: 0,
+          offsetY: 2
+        })
+        .margin({ bottom: 24 })
+
+      // 按钮区域
+      Row({ space: 12 }) {
+        Button("取消")
+          .onClick(() => {
+            if (this.controller) {
+              this.controller.close();
+            }
+          })
+          .layoutWeight(1)
+          .height(48)
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'B0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '60' 
+          })
+          .fontColor(this.currentTheme.glassmorphism.accentSecondary)
+          .backdropBlur(8)
+          .shadow({
+            radius: 8,
+            color: this.currentTheme.glassmorphism.accentSecondary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+
+        Button("确定")
+          .onClick(() => {
             if (this.newCollectionTitle.trim() === '') {
-            promptAction.showToast({ message: '合集名称不能为空' });
+              promptAction.showToast({ message: '合集名称不能为空' });
               return;
             }
-          this.onConfirm();
-          if (this.controller) {
-            this.controller.close();
+            this.onConfirm();
+            if (this.controller) {
+              this.controller.close();
+            }
+          })
+          .layoutWeight(1)
+          .height(48)
+          .linearGradient({
+            angle: 135,
+            colors: [
+              [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+              [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+            ]
+          })
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentPrimary + '60' 
+          })
+          .fontColor('#FFFFFF')
+          .backdropBlur(8)
+          .shadow({
+            radius: 12,
+            color: this.currentTheme.glassmorphism.accentPrimary + '50',
+            offsetX: 0,
+            offsetY: 3
+          })
+          .blur(0.2)
       }
-        }).layoutWeight(1).backgroundColor('#8A2BE2')
-      }.width('100%')
+      .width('100%')
     }
-    .padding(20).width("80%").backgroundColor(Color.White).borderRadius(15)
+    .padding(24)
+    .width(320)
+    .backgroundColor(this.currentTheme.backgroundColor + 'F8')
+    .borderRadius(24)
+    .backdropBlur(15)
+    .border({ 
+      width: 0.5, 
+      color: this.currentTheme.glassmorphism.accentPrimary + '40' 
+    })
+    .shadow({
+      radius: 25,
+      color: this.currentTheme.glassmorphism.accentPrimary + '30',
+      offsetX: 0,
+      offsetY: 10
+    })
+    .linearGradient({
+      angle: 135,
+      colors: [
+        [this.currentTheme.backgroundColor + 'F5', 0.0],
+        [this.currentTheme.glassmorphism.surfaceLight + 'F8', 1.0]
+      ]
+    })
   }
 }
 
 @CustomDialog
 struct PermissionDialog {
   controller: CustomDialogController;
+  @Prop currentTheme: ThemeConfig; // 添加主题属性
   onConfirm: () => void = () => {
   };
 
   build() {
     Column() {
-      Text('权限设置')
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 10, bottom: 10 })
-      
-      Text('请确保以下权限已开启：')
-        .fontSize(16)
-        .margin({ bottom: 16 })
-      
-      Text('• 通知权限')
-        .fontSize(14)
-        .margin({ bottom: 8 })
-      
-      Text('• 后台运行权限')
-        .fontSize(14)
-        .margin({ bottom: 8 })
-      
-      Text('• 自启动权限')
-        .fontSize(14)
-      
-      Row() {
+      // 标题区域
+      Column() {
+        Text('⚙️')
+          .fontSize(32)
+          .margin({ bottom: 8 })
+        Text('权限设置')
+          .fontSize(20)
+          .fontColor(this.currentTheme.textColor)
+          .fontWeight(FontWeight.Bold)
+      }
+      .alignItems(HorizontalAlign.Center)
+      .margin({ bottom: 24 })
+
+      // 内容区域
+      Column({ space: 12 }) {
+        Text('请确保以下权限已开启：')
+          .fontSize(16)
+          .fontColor(this.currentTheme.textColor)
+          .textAlign(TextAlign.Center)
+
+        Column({ space: 8 }) {
+          Text('• 通知权限')
+            .fontSize(14)
+            .fontColor(this.currentTheme.textColor + 'E0')
+          
+          Text('• 后台运行权限')
+            .fontSize(14)
+            .fontColor(this.currentTheme.textColor + 'E0')
+          
+          Text('• 自启动权限')
+            .fontSize(14)
+            .fontColor(this.currentTheme.textColor + 'E0')
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+      }
+      .margin({ bottom: 24 })
+
+      // 按钮区域
+      Row({ space: 12 }) {
         Button('取消')
           .onClick(() => {
             this.controller.close();
           })
-          .margin({ right: 10 })
+          .layoutWeight(1)
+          .height(48)
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'B0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '60' 
+          })
+          .fontColor(this.currentTheme.glassmorphism.accentSecondary)
+          .backdropBlur(8)
+          .shadow({
+            radius: 8,
+            color: this.currentTheme.glassmorphism.accentSecondary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
         
         Button('去设置')
           .onClick(() => {
             this.onConfirm();
             this.controller.close();
           })
+          .layoutWeight(1)
+          .height(48)
+          .linearGradient({
+            angle: 135,
+            colors: [
+              [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+              [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+            ]
+          })
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentPrimary + '60' 
+          })
+          .fontColor('#FFFFFF')
+          .backdropBlur(8)
+          .shadow({
+            radius: 12,
+            color: this.currentTheme.glassmorphism.accentPrimary + '50',
+            offsetX: 0,
+            offsetY: 3
+          })
+          .blur(0.2)
       }
-      .margin({ top: 20, bottom: 10 })
+      .width('100%')
     }
-    .width('80%')
-    .padding(20)
+    .padding(24)
+    .width(320)
+    .backgroundColor(this.currentTheme.backgroundColor + 'F8')
+    .borderRadius(24)
+    .backdropBlur(15)
+    .border({ 
+      width: 0.5, 
+      color: this.currentTheme.glassmorphism.accentPrimary + '40' 
+    })
+    .shadow({
+      radius: 25,
+      color: this.currentTheme.glassmorphism.accentPrimary + '30',
+      offsetX: 0,
+      offsetY: 10
+    })
+    .linearGradient({
+      angle: 135,
+      colors: [
+        [this.currentTheme.backgroundColor + 'F5', 0.0],
+        [this.currentTheme.glassmorphism.surfaceLight + 'F8', 1.0]
+      ]
+    })
   }
 }
 
@@ -230,39 +502,94 @@ struct PermissionDialog {
 struct AddSubTaskDialog {
   @State newTaskTitle: string = '';
   @State newTaskDuration: number = 25;
+  @Prop currentTheme: ThemeConfig; // 添加主题属性
   controller: CustomDialogController;
   onConfirm: (title: string, duration: number) => void = () => {};
 
   build() {
     Column() {
-      Text('添加子任务')
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 10, bottom: 10 })
-      
-      TextInput({ placeholder: '请输入任务标题' })
-        .width('90%')
-        .height(40)
-        .margin({ top: 16 })
-        .onChange((value: string) => {
-          this.newTaskTitle = value;
-        })
-      
-      TextInput({ placeholder: '请输入时长（分钟）' })
-        .width('90%')
-        .height(40)
-        .margin({ top: 16 })
-        .type(InputType.Number)
-        .onChange((value: string) => {
-          this.newTaskDuration = parseInt(value) || 25;
-        })
-      
-      Row() {
+      // 标题区域
+      Column() {
+        Text('📝')
+          .fontSize(32)
+          .margin({ bottom: 8 })
+        Text('添加子任务')
+          .fontSize(20)
+          .fontColor(this.currentTheme.textColor)
+          .fontWeight(FontWeight.Bold)
+      }
+      .alignItems(HorizontalAlign.Center)
+      .margin({ bottom: 24 })
+
+      // 输入区域
+      Column({ space: 16 }) {
+        TextInput({ placeholder: '请输入任务标题' })
+          .onChange((value: string) => {
+            this.newTaskTitle = value;
+          })
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'D0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '50' 
+          })
+          .fontColor(this.currentTheme.textColor)
+          .placeholderColor(this.currentTheme.textColor + '80')
+          .padding(16)
+          .backdropBlur(8)
+          .shadow({
+            radius: 6,
+            color: this.currentTheme.glassmorphism.accentPrimary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+
+        TextInput({ placeholder: '请输入时长（分钟）' })
+          .type(InputType.Number)
+          .onChange((value: string) => {
+            this.newTaskDuration = parseInt(value) || 25;
+          })
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'D0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '50' 
+          })
+          .fontColor(this.currentTheme.textColor)
+          .placeholderColor(this.currentTheme.textColor + '80')
+          .padding(16)
+          .backdropBlur(8)
+          .shadow({
+            radius: 6,
+            color: this.currentTheme.glassmorphism.accentPrimary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+      }
+      .margin({ bottom: 24 })
+
+      // 按钮区域
+      Row({ space: 12 }) {
         Button('取消')
           .onClick(() => {
             this.controller.close();
           })
-          .margin({ right: 10 })
+          .layoutWeight(1)
+          .height(48)
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'B0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '60' 
+          })
+          .fontColor(this.currentTheme.glassmorphism.accentSecondary)
+          .backdropBlur(8)
+          .shadow({
+            radius: 8,
+            color: this.currentTheme.glassmorphism.accentSecondary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
         
         Button('确定')
           .onClick(() => {
@@ -273,11 +600,54 @@ struct AddSubTaskDialog {
             this.onConfirm(this.newTaskTitle, this.newTaskDuration);
             this.controller.close();
           })
+          .layoutWeight(1)
+          .height(48)
+          .linearGradient({
+            angle: 135,
+            colors: [
+              [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+              [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+            ]
+          })
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentPrimary + '60' 
+          })
+          .fontColor('#FFFFFF')
+          .backdropBlur(8)
+          .shadow({
+            radius: 12,
+            color: this.currentTheme.glassmorphism.accentPrimary + '50',
+            offsetX: 0,
+            offsetY: 3
+          })
+          .blur(0.2)
       }
-      .margin({ top: 20, bottom: 10 })
+      .width('100%')
     }
-    .width('80%')
-    .padding(20)
+    .padding(24)
+    .width(320)
+    .backgroundColor(this.currentTheme.backgroundColor + 'F8')
+    .borderRadius(24)
+    .backdropBlur(15)
+    .border({ 
+      width: 0.5, 
+      color: this.currentTheme.glassmorphism.accentPrimary + '40' 
+    })
+    .shadow({
+      radius: 25,
+      color: this.currentTheme.glassmorphism.accentPrimary + '30',
+      offsetX: 0,
+      offsetY: 10
+    })
+    .linearGradient({
+      angle: 135,
+      colors: [
+        [this.currentTheme.backgroundColor + 'F5', 0.0],
+        [this.currentTheme.glassmorphism.surfaceLight + 'F8', 1.0]
+      ]
+    })
   }
 }
 
@@ -289,17 +659,7 @@ struct TodoDetail {
   @State currentIndex: number = 1;
   @State bgColor: string = 'rgba(173, 216, 230, 0.15)';
   @State showCongratulationsDialog: boolean = false;
-  @State currentTheme: ThemeConfig = {
-    id: 'light',
-    name: '浅色主题',
-    primaryColor: '#007AFF',
-    backgroundColor: '#FFFFFF',
-    textColor: '#000000',
-    cardBackgroundColor: '#F8F8F8',
-    borderColor: '#E0E0E0',
-    shadowColor: 'rgba(0, 0, 0, 0.1)',
-    errorColor: '#FF3B30'
-  };
+  @State currentTheme: ThemeConfig = DEFAULT_THEME_CONFIG;
   @State todoCollections: LocalTodoCollection[] = [
     new LocalTodoCollection("default_coll1", "学习鸿蒙开发", [
       new ActualTodoItem("s1_1", "阅读官方文档第一章", 25),
@@ -314,35 +674,24 @@ struct TodoDetail {
   ];
   private nextCollectionIdSuffix: number = 3;
   @State newCollectionTitle: string = '';
-  private addCollectionDialogController: CustomDialogController = new CustomDialogController({
-    builder: AddCollectionDialog({
-      newCollectionTitle: $newCollectionTitle,
-      onConfirm: () => {
-        this.addNewCollection();
-      }
-    }),
-    autoCancel: true,
-    alignment: DialogAlignment.Center
-  });
-  private addSubTaskDialogController: CustomDialogController = new CustomDialogController({
-    builder: AddSubTaskDialog({
-      onConfirm: (title: string, duration: number) => {
-        this.addNewSubTask(title, duration);
-      }
-    }),
-    autoCancel: true,
-    alignment: DialogAlignment.Center
-  });
+  private addCollectionDialogController: CustomDialogController | null = null;
+  private addSubTaskDialogController: CustomDialogController | null = null;
   private themeService = ThemeService.getInstance();
 
-  private themeChangeListener = (theme: ThemeConfig) => {
-    this.currentTheme = theme;
+  private themeChangeListener = async () => {
+    try {
+      this.currentTheme = await this.themeService.getCurrentTheme();
+    } catch (error) {
+      console.error('TodoDetail主题更新失败:', error);
+    }
   };
 
   async aboutToAppear() {
     console.info('TodoDetail aboutToAppear. CurrentIndex: ' + this.currentIndex);
     this.currentIndex = 1;
     this.themeService.addThemeChangeListener(this.themeChangeListener);
+    // 首先加载保存的主题偏好设置
+    await this.themeService.loadThemePreference();
     this.currentTheme = await this.themeService.getCurrentTheme();
     this.processRouteParams(); // 处理首次进入时可能存在的路由参数
   }
@@ -438,6 +787,54 @@ struct TodoDetail {
     updatedCollection.currentTaskIndex = collection.currentTaskIndex;
     this.todoCollections.splice(collectionIndex, 1, updatedCollection);
     this.todoCollections = Array.from(this.todoCollections);
+  }
+
+  // 动态创建添加合集弹窗
+  async openAddCollectionDialog() {
+    try {
+      this.newCollectionTitle = '';
+      const currentTheme = await this.themeService.getCurrentTheme();
+      
+      this.addCollectionDialogController = new CustomDialogController({
+        builder: AddCollectionDialog({
+          newCollectionTitle: $newCollectionTitle,
+          currentTheme: currentTheme,
+          onConfirm: () => {
+            this.addNewCollection();
+          }
+        }),
+        autoCancel: true,
+        alignment: DialogAlignment.Center,
+        customStyle: true,
+        maskColor: Color.Transparent
+      });
+      this.addCollectionDialogController.open();
+    } catch (error) {
+      console.error('打开添加合集弹窗失败:', error);
+    }
+  }
+
+  // 动态创建添加子任务弹窗
+  async openAddSubTaskDialog() {
+    try {
+      const currentTheme = await this.themeService.getCurrentTheme();
+      
+      this.addSubTaskDialogController = new CustomDialogController({
+        builder: AddSubTaskDialog({
+          currentTheme: currentTheme,
+          onConfirm: (title: string, duration: number) => {
+            this.addNewSubTask(title, duration);
+          }
+        }),
+        autoCancel: true,
+        alignment: DialogAlignment.Center,
+        customStyle: true,
+        maskColor: Color.Transparent
+      });
+      this.addSubTaskDialogController.open();
+    } catch (error) {
+      console.error('打开添加子任务弹窗失败:', error);
+    }
   }
 
   addNewCollection() {
@@ -763,8 +1160,7 @@ struct TodoDetail {
             .onClick(() => { this.startSystemSettingsGuidanceFlow(); })
             Text('+').fontSize(24).fontColor(Color.White)
               .onClick(() => {
-                this.newCollectionTitle = '';
-                this.addCollectionDialogController.open();
+                this.openAddCollectionDialog();
               })
             Text('≡').fontSize(24).fontColor(Color.White)
               .onClick(() => {
@@ -938,7 +1334,7 @@ struct TodoDetail {
                       .margin({ top: 12 })
                       .onClick(() => {
                         this.currentExpandedId = collection.id;
-                        this.addSubTaskDialogController.open();
+                        this.openAddSubTaskDialog();
                       })
                   }
                   .width('100%')

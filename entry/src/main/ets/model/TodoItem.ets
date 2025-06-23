@@ -1,5 +1,14 @@
 import { ApiService } from '../services/ApiService';
 
+// 定义JSON对象接口
+interface TodoItemJson {
+  id: number;
+  title: string;
+  type: string;
+  duration: number;
+  isCompleted: boolean;
+}
+
 export class TodoItem {
   id: number;
   title: string;
@@ -29,7 +38,8 @@ export class TodoItem {
       console.error('更新待办状态失败:', error);
       // 如果更新失败，恢复状态
       this.isCompleted = !this.isCompleted;
-      throw error;
+      const errorToThrow = error instanceof Error ? error : new Error(String(error));
+      throw errorToThrow;
     }
   }
 
@@ -39,11 +49,12 @@ export class TodoItem {
       // 例如：await this.apiService.deleteTodo(this.id);
     } catch (error) {
       console.error('删除待办失败:', error);
-      throw error;
+      const errorToThrow = error instanceof Error ? error : new Error(String(error));
+      throw errorToThrow;
     }
   }
 
-  static fromJson(json: any): TodoItem {
+  static fromJson(json: TodoItemJson): TodoItem {
     return new TodoItem(
       json.id,
       json.title,
@@ -53,7 +64,7 @@ export class TodoItem {
     );
   }
 
-  toJson(): any {
+  toJson(): TodoItemJson {
     return {
       id: this.id,
       title: this.title,

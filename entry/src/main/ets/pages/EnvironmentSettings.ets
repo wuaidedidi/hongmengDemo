@@ -2,24 +2,14 @@ import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import preferences from '@ohos.data.preferences';
 import { getAllEnvironments, EnvironmentConfig, DEFAULT_ENVIRONMENT } from '../config/Environment';
-import { ThemeService, ThemeConfig } from '../services/ThemeService';
+import { ThemeService, ThemeConfig, DEFAULT_THEME_CONFIG } from '../services/ThemeService';
 
 @Entry
 @Component
 struct EnvironmentSettings {
   @State currentEnvironment: string = DEFAULT_ENVIRONMENT;
   @State environments: EnvironmentConfig[] = getAllEnvironments();
-  @State currentTheme: ThemeConfig = {
-    id: 'light',
-    name: '浅色主题',
-    primaryColor: '#007AFF',
-    backgroundColor: '#F2F2F7',
-    textColor: '#000000',
-    cardBackgroundColor: '#FFFFFF',
-    borderColor: '#E5E5EA',
-    shadowColor: '#00000010',
-    errorColor: '#FF3B30'
-  };
+  @State currentTheme: ThemeConfig = DEFAULT_THEME_CONFIG;
   private themeService = ThemeService.getInstance();
   private preferencesStore: preferences.Preferences | null = null;
 
@@ -29,6 +19,8 @@ struct EnvironmentSettings {
 
   async aboutToAppear() {
     this.themeService.addThemeChangeListener(this.themeChangeListener);
+    // 首先加载保存的主题偏好设置
+    await this.themeService.loadThemePreference();
     this.currentTheme = await this.themeService.getCurrentTheme();
     
     // 初始化偏好设置

@@ -2,7 +2,7 @@ import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import { TabBar } from '../components/TabBar';
 import { ApiService, StatisticsResponse } from '../services/ApiService';
-import { ThemeService, ThemeConfig } from '../services/ThemeService';
+import { ThemeService, ThemeConfig, DEFAULT_THEME_CONFIG } from '../services/ThemeService';
 
 @Entry
 @Component
@@ -20,26 +20,22 @@ struct StatisticsPage {
   @State monthlyData: number[] = Array(30).fill(0).map(() => Math.floor(Math.random() * 200));
   @State dailyData: number[] = Array(24).fill(0).map(() => Math.floor(Math.random() * 60));
   @State isLoading: boolean = false;
-  @State currentTheme: ThemeConfig = {
-    id: 'light',
-    name: '浅色主题',
-    primaryColor: '#007AFF',
-    backgroundColor: '#F2F2F7',
-    textColor: '#000000',
-    cardBackgroundColor: '#FFFFFF',
-    borderColor: '#E5E5EA',
-    shadowColor: '#00000010',
-    errorColor: '#FF3B30'
-  };
+  @State currentTheme: ThemeConfig = DEFAULT_THEME_CONFIG;
   private apiService = ApiService.getInstance();
   private themeService = ThemeService.getInstance();
 
-  private themeChangeListener = (theme: ThemeConfig) => {
-    this.currentTheme = theme;
+  private themeChangeListener = async () => {
+    try {
+      this.currentTheme = await this.themeService.getCurrentTheme();
+    } catch (error) {
+      console.error('StatisticsPage主题更新失败:', error);
+    }
   };
 
   async aboutToAppear() {
     this.themeService.addThemeChangeListener(this.themeChangeListener);
+    // 首先加载保存的主题偏好设置
+    await this.themeService.loadThemePreference();
     this.currentTheme = await this.themeService.getCurrentTheme();
     await this.loadStatistics();
   }

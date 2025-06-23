@@ -1,7 +1,7 @@
 import { AddTodoCollectionDialog } from '../components/AddTodoCollectionDialog';
 import { AddSubTodoDialog } from '../components/AddSubTodoDialog';
 import { TabBar } from '../components/TabBar';
-import { ThemeService, ThemeConfig } from '../services/ThemeService';
+import { ThemeService, ThemeConfig, DEFAULT_THEME_CONFIG } from '../services/ThemeService';
 import { 
   ApiService, 
   TodoCollection, 
@@ -22,6 +22,17 @@ interface DialogData {
   description?: string;
 }
 
+// 滑动操作相关接口
+interface SwipeActionBuilder {
+  builder: () => void;
+  actionAreaDistance: number;
+  onAction: () => void;
+}
+
+interface SwipeActionOptions {
+  end: SwipeActionBuilder;
+}
+
 @Entry
 @Component
 struct TodoPage {
@@ -30,42 +41,39 @@ struct TodoPage {
   @State expandedCollections: Set<number> = new Set(); // 记录哪些合集是展开的
   @State collectionItems: Map<number, TodoCollectionItem[]> = new Map(); // 合集ID -> 子待办列表
   @State loadingItems: Set<number> = new Set(); // 正在加载子待办的合集ID
-  @State currentTheme: ThemeConfig = {
-    id: 'light',
-    name: '浅色主题',
-    primaryColor: '#007AFF',
-    backgroundColor: '#FFFFFF',
-    textColor: '#000000',
-    cardBackgroundColor: '#F8F8F8',
-    borderColor: '#E0E0E0',
-    shadowColor: 'rgba(0, 0, 0, 0.1)',
-    errorColor: '#FF3B30'
-  };
+  @State currentTheme: ThemeConfig = DEFAULT_THEME_CONFIG;
 
   private apiService: ApiService = ApiService.getInstance();
   private themeService: ThemeService = ThemeService.getInstance();
+  private themeChangeListener = async () => {
+    try {
+      this.currentTheme = await this.themeService.getCurrentTheme();
+    } catch (error) {
+      console.error('TodoPage主题更新失败:', error);
+    }
+  };
 
   // 待办合集对话框控制器
-  private addTodoCollectionDialogController: CustomDialogController = new CustomDialogController({
-    builder: AddTodoCollectionDialog({
-      onConfirm: (data: DialogData) => {
-        this.createTodoCollectionWithParams(data.title, data.description);
-      }
-    }),
-    autoCancel: true,
-    alignment: DialogAlignment.Center
-  });
+  private addTodoCollectionDialogController: CustomDialogController | null = null;
 
   // 添加子待办对话框控制器
   private addSubTodoDialogController: CustomDialogController | null = null;
 
   async aboutToAppear(): Promise<void> {
+    this.themeService.addThemeChangeListener(this.themeChangeListener);
     try {
+      // 首先加载保存的主题偏好设置
+      await this.themeService.loadThemePreference();
       this.currentTheme = await this.themeService.getCurrentTheme();
+      console.info('TodoPage加载主题成功:', this.currentTheme.name);
     } catch (error) {
       console.error('加载主题失败:', error);
     }
     await this.loadTodoCollections();
+  }
+
+  aboutToDisappear() {
+    this.themeService.removeThemeChangeListener(this.themeChangeListener);
   }
 
   async onPageShow(): Promise<void> {
@@ -164,7 +172,7 @@ struct TodoPage {
     }
   }
 
-  // 删除待办合集
+  // 删除待办合集 - 滑动删除
   async deleteTodoCollection(collectionId: number): Promise<void> {
     try {
       await this.apiService.deleteTodoCollection(collectionId);
@@ -183,7 +191,7 @@ struct TodoPage {
     }
   }
 
-  // 添加子待办
+  // 添加子待办 - 添加后自动展开
   async addSubTodo(collectionId: number, title: string, description?: string, durationMinutes: number = 25): Promise<void> {
     try {
       console.info(`发送添加子待办请求 - 合集ID: ${collectionId}, 标题: ${title}, 时长: ${durationMinutes}分钟`);
@@ -200,6 +208,13 @@ struct TodoPage {
       this.collectionItems.set(collectionId, existingItems);
       this.collectionItems = new Map(this.collectionItems);
       
+      // 自动展开该合集
+      if (!this.expandedCollections.has(collectionId)) {
+        this.expandedCollections.add(collectionId);
+        this.expandedCollections = new Set(this.expandedCollections);
+        console.info(`添加子任务后自动展开合集${collectionId}`);
+      }
+      
       promptAction.showToast(new ToastOptions('子待办添加成功'));
     } catch (error) {
       console.error('添加子待办失败:', error);
@@ -207,17 +222,14 @@ struct TodoPage {
     }
   }
 
-  // 删除子待办
+  // 删除子待办 - 滑动删除
   async deleteSubTodo(collectionId: number, itemId: number): Promise<void> {
     try {
       await this.apiService.deleteCollectionItem(collectionId, itemId);
-      
-      // 更新本地状态
-      const existingItems = this.collectionItems.get(collectionId) || [];
-      const updatedItems = existingItems.filter(item => item.id !== itemId);
+      const items = this.collectionItems.get(collectionId) || [];
+      const updatedItems = items.filter(item => item.id !== itemId);
       this.collectionItems.set(collectionId, updatedItems);
       this.collectionItems = new Map(this.collectionItems);
-      
       promptAction.showToast(new ToastOptions('子待办已删除'));
     } catch (error) {
       console.error('删除子待办失败:', error);
@@ -228,575 +240,560 @@ struct TodoPage {
   // 切换子待办完成状态
   async toggleSubTodoStatus(collectionId: number, itemId: number): Promise<void> {
     try {
-      const updatedItem = await this.apiService.toggleCollectionItemStatus(collectionId, itemId);
+      const items = this.collectionItems.get(collectionId) || [];
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
+      await this.apiService.toggleCollectionItemStatus(collectionId, itemId);
       
       // 更新本地状态
-      const items = this.collectionItems.get(collectionId) || [];
-      const itemIndex = items.findIndex(item => item.id === itemId);
-      if (itemIndex !== -1) {
-        items[itemIndex] = updatedItem;
-        this.collectionItems.set(collectionId, items);
-        this.collectionItems = new Map(this.collectionItems);
-      }
+      item.isCompleted = !item.isCompleted;
+      this.collectionItems.set(collectionId, [...items]);
+      this.collectionItems = new Map(this.collectionItems);
       
-      const message = updatedItem.isCompleted ? '子待办已完成' : '子待办已重新激活';
-      promptAction.showToast(new ToastOptions(message));
+      promptAction.showToast(new ToastOptions(item.isCompleted ? '任务已完成' : '任务已重新开启'));
     } catch (error) {
       console.error('更新子待办状态失败:', error);
-      promptAction.showToast(new ToastOptions('更新状态失败'));
+      promptAction.showToast(new ToastOptions('更新失败'));
     }
   }
 
-  // 开始单个子待办专注
+  // 开始专注子待办
   startFocusForSubTodo(collectionId: number, itemId: number): void {
     const items = this.collectionItems.get(collectionId) || [];
-    console.info(`开始单个子待办专注 - 合集ID: ${collectionId}, 子待办ID: ${itemId}, 总数: ${items.length}`);
-    
-    const currentIndex = items.findIndex(item => item.id === itemId);
-    
-    if (currentIndex === -1) {
-      console.error(`找不到子待办 ${itemId} 在合集 ${collectionId} 中`);
-      promptAction.showToast(new ToastOptions('找不到指定的子待办'));
-      return;
-    }
-    
-    const currentItem = items[currentIndex];
-    console.info(`当前任务信息:`, { id: currentItem.id, title: currentItem.title, index: currentIndex });
-    
-    const params: FocusTimerParams = {
-      title: currentItem.title,
-      taskTitle: currentItem.title,
-      time: 25 * 60, // 默认25分钟，因为ApiService中的TodoCollectionItem没有durationMinutes属性
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const focusParams: FocusTimerParams = {
+      title: item.title,
+      time: (item.durationMinutes || 25) * 60,
+      taskTitle: item.title,
       isSequence: true,
       collectionId: collectionId.toString(),
       subTaskId: itemId.toString(),
-      currentSubTaskIndex: currentIndex,
+      currentSubTaskIndex: items.findIndex(i => i.id === itemId),
       totalSubTasksInCollection: items.length
     };
 
-    console.info(`启动专注参数:`, JSON.stringify(params));
-
-    const routerOpts = new RouterOptions('pages/FocusTimer');
-    router.pushUrl({
-      url: routerOpts.url,
-      params: params
-    }, router.RouterMode.Single, (err: BusinessError) => {
-      if (err) {
-        console.error(`跳转FocusTimer出错: ${err.message}`);
-      }
-    });
+    router.pushUrl({ url: 'pages/FocusTimer', params: focusParams });
   }
 
-  // 开始合集序列专注（从第一个开始）
-  async startFocusForCollection(collection: TodoCollection): Promise<void> {
-    console.info(`开始合集序列专注 - 合集: ${collection.title}`);
+  // 开始序列专注（整个合集）
+  startSequenceFocus(collectionId: number): void {
+    const items = this.collectionItems.get(collectionId) || [];
+    const uncompletedItems = items.filter(item => !item.isCompleted);
     
-    // 自动展开合集（如果未展开）
-    if (!this.expandedCollections.has(collection.id)) {
-      console.info(`自动展开合集${collection.id}`);
-      this.expandedCollections.add(collection.id);
-      this.expandedCollections = new Set(this.expandedCollections);
-    }
-    
-    // 确保已加载子待办数据
-    if (!this.collectionItems.has(collection.id)) {
-      console.info(`合集${collection.id}的子待办数据未加载，开始加载...`);
-      try {
-        await this.loadCollectionItems(collection.id);
-      } catch (error) {
-        console.error('加载子待办数据失败:', error);
-        promptAction.showToast(new ToastOptions('加载子待办数据失败'));
-        return;
-      }
-    }
-    
-    const items = this.collectionItems.get(collection.id) || [];
-    console.info(`合集序列专注 - 子待办数量: ${items.length}`);
-    
-    if (items.length === 0) {
-      console.warn('合集中没有子待办');
-      promptAction.showToast(new ToastOptions('合集中没有子待办，请先添加子待办'));
+    if (uncompletedItems.length === 0) {
+      promptAction.showToast(new ToastOptions('该合集中没有未完成的任务'));
       return;
     }
 
-    // 查找第一个未完成的任务作为起始点
-    const firstIncompleteIndex = items.findIndex(item => !item.isCompleted);
-    const startIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex;
-    
-    if (startIndex >= items.length) {
-      promptAction.showToast(new ToastOptions('没有可用的任务'));
-      return;
-    }
-    
-    const firstItem = items[startIndex];
-    console.info(`序列起始任务:`, { 
-      firstItem: { id: firstItem.id, title: firstItem.title, isCompleted: firstItem.isCompleted },
-      startIndex: startIndex,
-      totalItems: items.length
-    });
-
-    const params: FocusTimerParams = {
-      title: `${collection.title} - ${firstItem.title}`,
+    const firstItem = uncompletedItems[0];
+    const focusParams: FocusTimerParams = {
+      title: firstItem.title,
+      time: (firstItem.durationMinutes || 25) * 60,
       taskTitle: firstItem.title,
-      time: 25 * 60, // 默认25分钟
       isSequence: true,
-      collectionId: collection.id.toString(),
+      collectionId: collectionId.toString(),
       subTaskId: firstItem.id.toString(),
-      currentSubTaskIndex: startIndex,
-      totalSubTasksInCollection: items.length
+      currentSubTaskIndex: 0,
+      totalSubTasksInCollection: uncompletedItems.length
     };
 
-    console.info(`启动序列专注参数:`, JSON.stringify(params));
-
-    const routerOpts = new RouterOptions('pages/FocusTimer');
-    router.pushUrl({
-      url: routerOpts.url,
-      params: params
-    }, router.RouterMode.Single, (err: BusinessError) => {
-      if (err) {
-        console.error(`跳转FocusTimer出错: ${err.message}`);
-      }
-    });
+    router.pushUrl({ url: 'pages/FocusTimer', params: focusParams });
   }
 
-  // 显示添加子待办对话框
-  showAddSubTodoDialog(collectionId: number): void {
-    this.addSubTodoDialogController = new CustomDialogController({
-      builder: AddSubTodoDialog({
-        onConfirm: (title: string, description: string, duration: number) => {
-          this.addSubTodo(collectionId, title, description, duration);
-        }
-      }),
-      autoCancel: true,
-      alignment: DialogAlignment.Center
-    });
-    this.addSubTodoDialogController.open();
-  }
-
-  // 渲染待办合集列表
+  // 苹果风格的合集卡片组件 - 支持滑动删除
   @Builder
-  buildTodoCollectionsList() {
-    if (this.isLoadingCollections) {
-      Row() {
-        LoadingProgress()
-          .width(30)
-          .height(30)
-          .margin({ right: 10 })
-        Text('加载中...')
-          .fontSize(16)
-          .fontColor(this.currentTheme.textColor)
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
-      .padding(20)
-    } else if (this.todoCollections.length === 0) {
+  CollectionCard(collection: TodoCollection) {
+    // 使用ListItem来实现滑动删除
+    ListItem() {
       Column() {
-        Text('暂无待办合集')
-          .fontSize(16)
-          .fontColor(this.currentTheme.textColor)
-          .opacity(0.6)
-        Text('点击右上角 + 号添加新的待办合集')
-          .fontSize(14)
-          .fontColor(this.currentTheme.textColor)
-          .opacity(0.4)
-          .margin({ top: 8 })
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
-      .padding(40)
-    } else {
-      List({ space: 8 }) {
-      ForEach(this.todoCollections, (collection: TodoCollection) => {
-          ListItem() {
-            this.buildCollectionItemView(collection)
-          }
-          .swipeAction({
-            end: {
-              builder: () => {
-                this.deleteCollectionBuilder(collection)
-              }
-            }
-          })
-        }, (collection: TodoCollection) => collection.id.toString())
-      }
-      .width('100%')
-      .divider({ strokeWidth: 0 })
-    }
-  }
+        // 合集标题区域
+        Row() {
+                  Column() {
+          Text(collection.title)
+            .fontSize(18)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.currentTheme.textColor)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          
+          Text(collection.description || '')
+            .fontSize(14)
+            .fontColor(this.currentTheme.textColor)
+            .opacity(0.6)
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .margin({ top: 4 })
+            .visibility(collection.description ? Visibility.Visible : Visibility.None)
+        }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
 
-  // 构建合集项视图
-  @Builder
-  buildCollectionItemView(collection: TodoCollection) {
-        Column() {
-      // 合集主行
-          Row() {
-        // 展开/折叠指示器
-        Text(this.expandedCollections.has(collection.id) ? '▼' : '▶')
-          .fontSize(14)
-          .fontColor(this.currentTheme.textColor)
-          .opacity(0.6)
-          .width(20)
+          // 展开/折叠按钮
+          Button() {
+            Text(this.expandedCollections.has(collection.id) ? '▼' : '▶')
+              .fontSize(14)
+              .fontColor(this.currentTheme.glassmorphism.accentPrimary)
+          }
+          .backgroundColor('transparent')
+          .width(32)
+          .height(32)
           .onClick(() => {
             this.toggleCollectionExpanded(collection.id);
           })
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 16, bottom: 12 })
 
-            Column() {
-              Text(collection.title)
-                .fontSize(18)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(this.currentTheme.textColor)
-              
-              if (collection.description) {
-                Text(collection.description)
-                  .fontSize(14)
-                  .fontColor(this.currentTheme.textColor)
-                  .opacity(0.6)
-                  .margin({ top: 4 })
-              }
-              
-          Text(this.getItemCountText(collection.id))
-                .fontSize(12)
-                .fontColor(this.currentTheme.textColor)
-                .opacity(0.5)
-                .margin({ top: 4 })
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
-                .onClick(() => {
-          this.toggleCollectionExpanded(collection.id);
-                })
-              
-        Button('开始序列')
-                .fontSize(12)
-                .fontColor(Color.White)
-          .backgroundColor(this.currentTheme.primaryColor)
-                .borderRadius(8)
-                .height(28)
-                .padding({left: 8, right: 8})
-          .onClick(async () => {
-            await this.startFocusForCollection(collection);
-          })
+        // 操作按钮区域 - 苹果风格渐变设计
+        Row({ space: 8 }) {
+          Button('📝 添加子任务')
+            .fontSize(12)
+            .fontColor(this.currentTheme.glassmorphism.accentPrimary)
+            .backgroundColor(this.currentTheme.glassmorphism.surfaceLight)
+            .borderRadius(16)
+            .height(32)
+            .padding({ left: 12, right: 12 })
+            .border({ width: 1, color: this.currentTheme.glassmorphism.borderLight })
+            .shadow({
+              radius: 4,
+              color: this.currentTheme.glassmorphism.shadowSoft,
+              offsetX: 0,
+              offsetY: 1
+            })
+            .onClick(() => {
+              this.showAddSubTodoDialog(collection.id);
+            })
+
+          Button('🚀 开始序列')
+            .fontSize(12)
+            .fontColor('#FFFFFF')
+            .linearGradient({
+              angle: 135,
+              colors: [
+                [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+                [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+              ]
+            })
+            .borderRadius(16)
+            .height(32)
+            .padding({ left: 12, right: 12 })
+            .shadow({
+              radius: 6,
+              color: this.currentTheme.glassmorphism.accentPrimary + '40',
+              offsetX: 0,
+              offsetY: 2
+            })
+            .blur(0.3) // 轻微哑光效果
+            .onClick(() => {
+              this.startSequenceFocus(collection.id);
+            })
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, bottom: 16 })
+
+        // 子待办列表
+        Column() {
+          Divider()
+            .color(this.currentTheme.glassmorphism.borderLight)
+            .margin({ left: 16, right: 16 })
+
+          // 加载状态
+          Row() {
+            LoadingProgress()
+              .width(20)
+              .height(20)
+              .color(this.currentTheme.glassmorphism.accentPrimary)
+            Text('加载中...')
+              .fontSize(14)
+              .fontColor(this.currentTheme.textColor)
+              .opacity(0.6)
+              .margin({ left: 8 })
           }
           .width('100%')
-          .padding(12)
+          .height(60)
+          .justifyContent(FlexAlign.Center)
+          .visibility(this.loadingItems.has(collection.id) ? Visibility.Visible : Visibility.None)
 
-      // 子待办列表（展开时显示）
-      if (this.expandedCollections.has(collection.id)) {
-        this.buildSubItemsList(collection.id)
-      }
-    }
-    .width('100%')
-    .backgroundColor(this.currentTheme.cardBackgroundColor)
-    .borderRadius(8)
-  }
-
-  // 构建子项列表
-  @Builder
-  buildSubItemsList(collectionId: number) {
-            Divider()
-              .color(this.currentTheme.borderColor)
-              .margin({ left: 12, right: 12 })
-            
-    if (this.loadingItems.has(collectionId)) {
-      Row() {
-        LoadingProgress()
-          .width(20)
-          .height(20)
-          .margin({ right: 8 })
-        Text('加载子待办中...')
-          .fontSize(14)
-          .fontColor(this.currentTheme.textColor)
-          .opacity(0.6)
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
-      .padding({ top: 10, bottom: 10 })
-    } else {
-      Column({ space: 4 }) {
-        // 使用List组件支持swipeAction
-        List({ space: 4 }) {
-          ForEach(this.getCollectionItems(collectionId), (item: TodoCollectionItem, index: number) => {
-            ListItem() {
-              this.buildSubItemRow(item, index, collectionId)
-            }
-            .swipeAction({
-              end: {
-                builder: () => {
-                  this.deleteSubTodoBuilder(item, collectionId)
-                }
-              }
-            })
-          }, (item: TodoCollectionItem) => item.id.toString())
-        }
-        .width('100%')
-        .scrollBar(BarState.Off)
-
-        // 添加子待办按钮
-        Row() {
-          Text('+')
-            .fontSize(16)
-            .fontColor(this.currentTheme.primaryColor)
-            .width(30)
-          
-          Text('添加子待办')
+          // 空状态
+          Text('暂无子任务')
             .fontSize(14)
-            .fontColor(this.currentTheme.primaryColor)
-            .layoutWeight(1)
+            .fontColor(this.currentTheme.textColor)
+            .opacity(0.5)
+            .width('100%')
+            .height(60)
+            .textAlign(TextAlign.Center)
+            .padding({ top: 20 })
+            .visibility(!this.loadingItems.has(collection.id) && (this.collectionItems.get(collection.id) || []).length === 0 ? Visibility.Visible : Visibility.None)
+
+          // 子任务列表
+          List() {
+            ForEach(this.collectionItems.get(collection.id) || [], (item: TodoCollectionItem) => {
+              this.SubTodoItem(collection.id, item);
+            }, (item: TodoCollectionItem) => item.id.toString())
+          }
+          .width('100%')
+          .backgroundColor('transparent')
+          .divider({ strokeWidth: 0 })
+          .visibility(!this.loadingItems.has(collection.id) && (this.collectionItems.get(collection.id) || []).length > 0 ? Visibility.Visible : Visibility.None)
         }
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-        .onClick(() => {
-          this.showAddSubTodoDialog(collectionId);
-        })
+        .visibility(this.expandedCollections.has(collection.id) ? Visibility.Visible : Visibility.None)
       }
       .width('100%')
-      .padding({ bottom: 8 })
-    }
-  }
-
-  // 构建子项行
-  @Builder
-  buildSubItemRow(item: TodoCollectionItem, index: number, collectionId: number) {
-                Row() {
-                  Text(`${index + 1}.`)
-                    .fontSize(14)
-                    .fontColor(this.currentTheme.textColor)
-                    .opacity(0.6)
-        .width(30)
-                  
-                  Column() {
-                    Text(item.title)
-                      .fontSize(14)
-                      .fontColor(this.currentTheme.textColor)
-          .decoration({type: item.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None })
-          .opacity(item.isCompleted ? 0.6 : 1.0)
-                              .textAlign(TextAlign.Start)
-                    
-                    if (item.description) {
-                      Text(item.description)
-                        .fontSize(12)
-                        .fontColor(this.currentTheme.textColor)
-            .opacity(item.isCompleted ? 0.4 : 0.6)
-                        .margin({ top: 2 })
-                    }
-                  }
-                  .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start)
-                  
-      Text('25min') // 默认25分钟，因为ApiService中的TodoCollectionItem没有durationMinutes属性
-                    .fontSize(12)
-                    .fontColor(this.currentTheme.textColor)
-                    .opacity(0.5)
-        .margin({ right: 8 })
-                  
-      if (item.isCompleted) {
-                    Text('✓')
-                      .fontSize(16)
-                      .fontColor('#34C759')
-          .margin({ right: 8 })
-      }
-
-      Button('开始')
-        .fontSize(10)
-        .fontColor(Color.White)
-        .backgroundColor(this.currentTheme.primaryColor)
-        .borderRadius(6)
-        .height(24)
-        .padding({left: 6, right: 6})
-        .onClick(() => {
-          this.startFocusForSubTodo(collectionId, item.id);
-        })
-                }
-                .width('100%')
-                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-    .backgroundColor(item.isCompleted ? 'rgba(0, 0, 0, 0.05)' : 'transparent')
-                .borderRadius(4)
-    .onClick(() => {
-      this.toggleSubTodoStatus(collectionId, item.id);
-    })
-  }
-
-  // 删除子待办按钮构建器
-  @Builder
-  deleteSubTodoBuilder(item: TodoCollectionItem, collectionId: number) {
-    Row() {
-      Column() {
-        Text('🗑️')
-          .fontSize(16)
-          .margin({ bottom: 2 })
-        Text('删除')
-          .fontSize(10)
-          .fontColor(Color.White)
-          .fontWeight(FontWeight.Medium)
-      }
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
-      .width(70)
-      .height('100%')
-      .linearGradient({
-        direction: GradientDirection.Bottom,
-        colors: [['#FF6B6B', 0.0], ['#FF3B30', 1.0]]
-      })
-      .shadow({
-        radius: 6,
-        color: 'rgba(255, 59, 48, 0.3)',
-        offsetX: 2,
-        offsetY: 2
-      })
-      .onClick(() => {
-        AlertDialog.show({
-          title: '确认删除',
-          message: `确定要删除子待办"${item.title}"吗？`,
-          primaryButton: {
-            value: '取消',
-            action: () => {}
-          },
-          secondaryButton: {
-            value: '删除',
-            fontColor: '#FF3B30',
-            action: () => {
-              this.deleteSubTodo(collectionId, item.id);
-            }
-          }
-        });
-      })
-    }
-    .height('100%')
-  }
-
-  // 删除合集按钮构建器
-  @Builder
-  deleteCollectionBuilder(collection: TodoCollection) {
-    Row() {
-      Column() {
-        Text('🗑️')
-          .fontSize(18)
-          .margin({ bottom: 2 })
-        Text('删除')
-          .fontSize(12)
-          .fontColor(Color.White)
-          .fontWeight(FontWeight.Medium)
-      }
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
-      .width(80)
-      .height('100%')
-      .linearGradient({
-        direction: GradientDirection.Bottom,
-        colors: [['#FF6B6B', 0.0], ['#FF3B30', 1.0]]
-      })
+      .backgroundColor(this.currentTheme.glassmorphism.surfaceLight)
+      .borderRadius(16)
+      .border({ width: 1, color: this.currentTheme.glassmorphism.borderLight })
       .shadow({
         radius: 8,
-        color: 'rgba(255, 59, 48, 0.3)',
-        offsetX: 2,
-        offsetY: 2
+        color: this.currentTheme.glassmorphism.shadowSoft,
+        offsetX: 0,
+        offsetY: 4
       })
-      .onClick(() => {
-        AlertDialog.show({
-          title: '确认删除',
-          message: `确定要删除待办合集"${collection.title}"吗？`,
-          primaryButton: {
-            value: '取消',
-            action: () => {}
-          },
-          secondaryButton: {
-            value: '删除',
-            fontColor: '#FF3B30',
-            action: () => {
-              this.deleteTodoCollection(collection.id);
-            }
-          }
-        });
-      })
-      .gesture(
-        TapGesture()
-          .onAction(() => {
-            animateTo({
-              duration: 150,
-              curve: Curve.FastOutSlowIn
-            }, () => {
-              // 点击反馈动画
-            })
-          })
-      )
-      .stateStyles({
-        pressed: {
-          .backgroundColor('#D32F2F')
-          .scale({ x: 0.95, y: 0.95 })
-        },
-        normal: {
-          .backgroundColor('transparent')
-          .scale({ x: 1.0, y: 1.0 })
+      .margin({ bottom: 16 })
+    }
+    .swipeAction(this.createDeleteAction(collection.id, 80))
+  }
+
+  // 苹果风格的子待办项组件 - 支持滑动删除
+  @Builder
+  SubTodoItem(collectionId: number, item: TodoCollectionItem) {
+    ListItem() {
+      Row() {
+        // 完成状态按钮
+        Button() {
+          Text(item.isCompleted ? '✓' : '○')
+            .fontSize(16)
+            .fontColor(item.isCompleted ? '#FFFFFF' : this.currentTheme.glassmorphism.accentPrimary)
         }
-      })
-    }
-    .width(80)
-    .height('100%')
-    .backgroundColor('transparent')
-  }
+        .width(32)
+        .height(32)
+        .borderRadius(16)
+        .backgroundColor(item.isCompleted ? this.currentTheme.glassmorphism.accentPrimary : 'transparent')
+        .border({ 
+          width: 2, 
+          color: this.currentTheme.glassmorphism.accentPrimary 
+        })
+        .onClick(() => {
+          this.toggleSubTodoStatus(collectionId, item.id);
+        })
 
-  // 获取子待办数量的显示文本
-  getItemCountText(collectionId: number): string {
-    if (this.loadingItems.has(collectionId)) {
-      return '加载中...';
-    }
-    
-    const items = this.collectionItems.get(collectionId);
-    if (items === undefined) {
-      // 如果合集是展开状态但数据未加载，显示加载中
-      if (this.expandedCollections.has(collectionId)) {
-        return '加载中...';
+        // 任务信息
+        Column() {
+          Text(item.title)
+            .fontSize(16)
+            .fontColor(this.currentTheme.textColor)
+            .opacity(item.isCompleted ? 0.5 : 1.0)
+            .decoration({ type: item.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None })
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+          // 描述文本 - 主题感知渐变样式
+          Stack() {
+            // 渐变背景
+            Text(item.description || '')
+              .fontSize(12)
+              .fontColor('transparent')
+              .linearGradient({
+                angle: 90,
+                colors: item.isCompleted ? [
+                  [this.currentTheme.glassmorphism.accentTertiary, 0.0],
+                  [this.currentTheme.glassmorphism.borderLight, 1.0]
+                ] : [
+                  [this.currentTheme.glassmorphism.accentSecondary, 0.0],
+                  [this.currentTheme.glassmorphism.accentPrimary, 1.0]
+                ]
+              })
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .blur(0.2) // 轻微哑光效果
+
+            // 文字内容
+            Text(item.description || '')
+              .fontSize(12)
+              .fontColor(item.isCompleted ? 
+                this.currentTheme.glassmorphism.accentTertiary : 
+                this.currentTheme.glassmorphism.accentSecondary)
+              .opacity(item.isCompleted ? 0.5 : 0.8)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .margin({ top: 2 })
+          .visibility(item.description ? Visibility.Visible : Visibility.None)
+
+          Stack() {
+            // 渐变背景
+            Text(`⏱️ ${item.durationMinutes || 25}分钟`)
+              .fontSize(12)
+              .fontColor('transparent')
+              .linearGradient({
+                angle: 45,
+                colors: [
+                  [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+                  [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+                ]
+              })
+              .fontWeight(FontWeight.Medium)
+              .blur(0.1) // 轻微哑光效果
+
+            // 文字内容
+            Text(`⏱️ ${item.durationMinutes || 25}分钟`)
+              .fontSize(12)
+              .fontColor(this.currentTheme.glassmorphism.accentPrimary)
+              .fontWeight(FontWeight.Medium)
+          }
+          .margin({ top: 2 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ left: 12 })
+
+        // 专注按钮 - 主题感知渐变哑光设计
+        Stack() {
+          // 渐变背景层
+          Column()
+            .width(34)
+            .height(34)
+            .borderRadius(16)
+            .linearGradient({
+              angle: 135,
+              colors: [
+                [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+                [this.currentTheme.glassmorphism.accentSecondary, 0.5],
+                [this.currentTheme.glassmorphism.accentTertiary, 1.0]
+              ]
+            })
+            .shadow({
+              radius: 10,
+              color: this.currentTheme.glassmorphism.accentPrimary + '40',
+              offsetX: 0,
+              offsetY: 3
+            })
+            .border({ 
+              width: 0.5, 
+              color: this.currentTheme.glassmorphism.accentPrimary + '60' 
+            })
+            .blur(0.6) // 增强哑光效果
+
+          // 按钮内容
+          Button('🎯')
+            .fontSize(12)
+            .fontColor('#FFFFFF')
+            .backgroundColor('transparent')
+            .borderRadius(16)
+            .width(34)
+            .height(34)
+            .onClick(() => {
+              this.startFocusForSubTodo(collectionId, item.id);
+            })
+        }
+        .visibility(item.isCompleted ? Visibility.None : Visibility.Visible)
       }
-      // 如果合集是折叠状态，显示未加载
-      return '点击展开查看';
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .backgroundColor(this.currentTheme.backgroundColor)
+      .borderRadius(12)
+      .margin({ left: 8, right: 8, top: 4, bottom: 4 })
     }
-    
-    return `${items.length} 个子待办`;
+    .swipeAction(this.createSubTodoDeleteAction(collectionId, item.id, 60))
   }
 
-  // 辅助方法
-  getItemCount(collectionId: number): number {
-    return this.collectionItems.get(collectionId)?.length || 0;
+  // 显示添加合集对话框
+  async showAddTodoCollectionDialog(): Promise<void> {
+    try {
+      // 预先获取当前主题，确保弹窗显示时主题已加载
+      const currentTheme = await this.themeService.getCurrentTheme();
+      console.info('准备打开添加合集弹窗，当前主题:', currentTheme.name);
+      
+      // 每次打开时重新创建，确保获取最新主题
+      this.addTodoCollectionDialogController = new CustomDialogController({
+        builder: AddTodoCollectionDialog({
+          currentTheme: currentTheme, // 传递当前主题
+          onConfirm: (data: DialogData) => {
+            this.createTodoCollectionWithParams(data.title, data.description);
+          }
+        }),
+        autoCancel: true,
+        alignment: DialogAlignment.Center,
+        customStyle: true, // 使用自定义样式
+        maskColor: Color.Transparent // 去掉默认的遮罩颜色
+      });
+      this.addTodoCollectionDialogController.open();
+    } catch (error) {
+      console.error('打开添加合集弹窗失败:', error);
+    }
   }
 
-  getCollectionItems(collectionId: number): TodoCollectionItem[] {
-    return this.collectionItems.get(collectionId) || [];
+  // 显示添加子待办对话框
+  async showAddSubTodoDialog(collectionId: number): Promise<void> {
+    try {
+      // 预先获取当前主题，确保弹窗显示时主题已加载
+      const currentTheme = await this.themeService.getCurrentTheme();
+      console.info('准备打开添加子待办弹窗，当前主题:', currentTheme.name);
+      
+      // 每次打开时重新创建，确保获取最新主题
+      this.addSubTodoDialogController = new CustomDialogController({
+        builder: AddSubTodoDialog({
+          currentTheme: currentTheme, // 传递当前主题
+          onConfirm: (title: string, description: string, duration: number) => {
+            this.addSubTodo(collectionId, title, description, duration);
+          }
+        }),
+        autoCancel: true,
+        alignment: DialogAlignment.Center,
+        customStyle: true, // 使用自定义样式
+        maskColor: Color.Transparent // 去掉默认的遮罩颜色
+      });
+      this.addSubTodoDialogController.open();
+    } catch (error) {
+      console.error('打开添加子待办弹窗失败:', error);
+    }
+  }
+
+  // 创建删除合集的滑动操作
+  private createDeleteAction(collectionId: number, width: number): SwipeActionOptions {
+    const deleteAction: SwipeActionOptions = {
+      end: {
+        builder: () => {
+          this.createDeleteButton(width, 16, () => {
+            this.deleteTodoCollection(collectionId);
+          });
+        },
+        actionAreaDistance: width,
+        onAction: () => {
+          this.deleteTodoCollection(collectionId);
+        }
+      } as SwipeActionBuilder
+    };
+    return deleteAction;
+  }
+
+  // 创建删除子待办的滑动操作
+  private createSubTodoDeleteAction(collectionId: number, itemId: number, width: number): SwipeActionOptions {
+    const deleteAction: SwipeActionOptions = {
+      end: {
+        builder: () => {
+          this.createDeleteButton(width, 12, () => {
+            this.deleteSubTodo(collectionId, itemId);
+          });
+        },
+        actionAreaDistance: width,
+        onAction: () => {
+          this.deleteSubTodo(collectionId, itemId);
+        }
+      } as SwipeActionBuilder
+    };
+    return deleteAction;
+  }
+
+  // 创建删除按钮的构建器
+  @Builder
+  private createDeleteButton(width: number, borderRadius: number, clickAction: () => void) {
+    Button('删除')
+      .fontSize(width > 70 ? 16 : 14)
+      .fontColor('#FFFFFF')
+      .backgroundColor('#FF3B30')
+      .borderRadius(borderRadius)
+      .width(width)
+      .height(width > 70 ? '100%' : '90%')
+      .onClick(clickAction)
   }
 
   build() {
     Column() {
-      // 顶部标题栏
+      // 苹果风格的顶部导航栏
       Row() {
-        Text('待办合集管理')
+        Text('📝 待办管理')
           .fontSize(22)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
-        
-        Blank()
-        
-        Button('+')
-          .fontSize(24)
-          .fontColor('#FFFFFF')
-          .backgroundColor('transparent')
-          .onClick(() => {
-              this.addTodoCollectionDialogController.open();
-          })
+          .fontColor(this.currentTheme.textColor)
+          .layoutWeight(1)
+
+        Button() {
+          Text('＋')
+            .fontSize(20)
+            .fontColor('#FFFFFF')
+        }
+        .width(36)
+        .height(36)
+        .borderRadius(18)
+        .linearGradient({
+          angle: 135,
+          colors: [
+            [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+            [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+          ]
+        })
+        .shadow({
+          radius: 10,
+          color: this.currentTheme.glassmorphism.accentPrimary + '50',
+          offsetX: 0,
+          offsetY: 3
+        })
+        .blur(0.3) // 哑光效果
+        .onClick(() => {
+          this.showAddTodoCollectionDialog();
+        })
       }
       .width('100%')
-      .height(50)
-      .padding({ left: 16, right: 16 })
-      .backgroundColor(this.currentTheme.primaryColor)
+      .height(64)
+      .padding({ left: 20, right: 20 })
+      .backgroundColor(this.currentTheme.backgroundColor)
 
-      // 内容区域
-      Scroll() {
-        Column() {
-            this.buildTodoCollectionsList()
-        }
-        .width('100%')
-        .padding(16)
+      // 主内容区域
+      // 加载状态
+      Column() {
+        LoadingProgress()
+          .width(40)
+          .height(40)
+          .color(this.currentTheme.glassmorphism.accentPrimary)
+        Text('加载中...')
+          .fontSize(16)
+          .fontColor(this.currentTheme.textColor)
+          .opacity(0.6)
+          .margin({ top: 16 })
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .justifyContent(FlexAlign.Center)
+      .backgroundColor(this.currentTheme.backgroundColor)
+      .visibility(this.isLoadingCollections ? Visibility.Visible : Visibility.None)
+
+      // 空状态
+      Column() {
+        Text('📋')
+          .fontSize(64)
+          .opacity(0.3)
+          .margin({ bottom: 16 })
+        Text('还没有待办合集')
+          .fontSize(18)
+          .fontColor(this.currentTheme.textColor)
+          .opacity(0.5)
+          .margin({ bottom: 8 })
+        Text('点击右上角 + 号创建第一个合集')
+          .fontSize(14)
+          .fontColor(this.currentTheme.textColor)
+          .opacity(0.4)
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .justifyContent(FlexAlign.Center)
+      .backgroundColor(this.currentTheme.backgroundColor)
+      .visibility(!this.isLoadingCollections && this.todoCollections.length === 0 ? Visibility.Visible : Visibility.None)
+
+      // 合集列表 - 支持滑动删除
+      List() {
+        ForEach(this.todoCollections, (collection: TodoCollection) => {
+          this.CollectionCard(collection);
+        }, (collection: TodoCollection) => collection.id.toString())
       }
       .layoutWeight(1)
       .backgroundColor(this.currentTheme.backgroundColor)
+      .scrollBar(BarState.Off)
+      .padding({ left: 16, right: 16, top: 16, bottom: 100 })
+      .divider({ strokeWidth: 0 })
+      .visibility(!this.isLoadingCollections && this.todoCollections.length > 0 ? Visibility.Visible : Visibility.None)
 
       // 底部导航栏
       TabBar({ currentIndex: 1 })

@@ -8,7 +8,9 @@ import abilityAccessCtrl from '@ohos.abilityAccessCtrl';
 import { PhxSystemActionUtil } from '../utils/PhxSystemActionUtil';
 import { ApiService, TodoItemRequest } from '../services/ApiService';
 import type { TodoItem as ApiTodoItem } from '../services/ApiService';
-import { ThemeService, ThemeConfig } from '../services/ThemeService';
+import { TodoItem } from '../model/TodoItem';
+import { ThemeService, ThemeConfig, DEFAULT_THEME_CONFIG } from '../services/ThemeService';
+import { ThemeAwareGlassCard, ThemeAwareGradientBackground, GlassmorphismStyles } from '../utils/GlassmorphismStyles';
 
 // TodoList 被移除，因为它与 TodoCollection 关联较多，后续按需调整
 // import { TodoList } from '../view/TodoList';
@@ -133,33 +135,6 @@ interface RouterParams {
   // allSubTasksInCollectionCompleted?: string;
 }
 
-// TodoItem类定义 (这个是 Index.ets 使用的简单待办项)
-class TodoItem {
-  id: number; // 简单待办使用数字ID
-  title: string;
-  type: string; // 例如：'学习', '工作', '锻炼'
-  duration: number = 25; // 默认25分钟
-  isCompleted: boolean = false; // 添加完成状态
-
-  constructor(id: number, title: string, type: string, duration: number = 25, isCompleted: boolean = false) {
-    this.id = id;
-    this.title = title;
-    this.type = type;
-    this.duration = duration;
-    this.isCompleted = isCompleted;
-  }
-
-  formatDuration(): string {
-    return `${this.duration}分钟`;
-  }
-}
-
-// // 新的：单个具体待办事项 (移至 TodoDetail.ets)
-// class ActualTodoItem { ... }
-
-// // 修改的：待办事项合集 (移至 TodoDetail.ets)
-// class TodoCollection { ... }
-
 // 在文件顶部的接口定义部分添加一个通用错误类型
 // 通用错误类型，用于处理各种错误情况
 interface ErrorInfo {
@@ -189,41 +164,171 @@ function createErrorInfoFromObject(errObj: CommonError): ErrorInfo {
 // AddSimpleTodoDialog 保持，用于添加简单待办
 @CustomDialog
 struct AddSimpleTodoDialog {
-  @Link todoName: string;
-  @Link todoType: string;
-  @Link todoDuration: number;
-  onConfirm: () => void = () => {
+  @State todoName: string = '';
+  @State todoType: string = '';
+  @State todoDuration: number = 25;
+  @Prop currentTheme: ThemeConfig; // 添加主题属性
+  onConfirm: (name: string, type: string, duration: number) => void = () => {
   };
   controller?: CustomDialogController;
 
   build() {
     Column() {
-      Text("添加新待办").fontSize(20).fontWeight(FontWeight.Bold).margin({ bottom: 20 })
-      TextInput({ placeholder: "待办名称", text: this.todoName })
-        .onChange(val => {
-          this.todoName = val;
-        })
-        .margin({ bottom: 10 })
-      TextInput({ placeholder: "类型 (如: 学习, 工作)", text: this.todoType })
-        .onChange(val => {
-          this.todoType = val;
-        })
-        .margin({ bottom: 10 })
-      TextInput({ placeholder: "时长 (分钟)", text: this.todoDuration.toString() })
-        .type(InputType.Number)
-        .onChange(val => {
-          this.todoDuration = Number(val) || 25;
-        })
-        .margin({ bottom: 20 })
-      Row({ space: 10 }) {
-        Button("取消").onClick(() => this.controller?.close()).layoutWeight(1)
-        Button("确定").onClick(() => {
-          this.onConfirm();
-          this.controller?.close();
-        }).layoutWeight(1).backgroundColor('#8A2BE2')
-      }.width('100%')
+      // 标题区域
+      Column() {
+        Text('✨')
+          .fontSize(32)
+          .margin({ bottom: 8 })
+        Text('添加新待办')
+          .fontSize(20)
+          .fontColor(this.currentTheme.textColor)
+          .fontWeight(FontWeight.Bold)
+      }
+      .alignItems(HorizontalAlign.Center)
+      .margin({ bottom: 24 })
+
+      // 输入区域
+      Column({ space: 16 }) {
+        TextInput({ placeholder: "待办名称", text: this.todoName })
+          .onChange(val => {
+            this.todoName = val;
+          })
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'D0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '50' 
+          })
+          .fontColor(this.currentTheme.textColor)
+          .placeholderColor(this.currentTheme.textColor + '80')
+          .padding(16)
+          .backdropBlur(8)
+          .shadow({
+            radius: 6,
+            color: this.currentTheme.glassmorphism.accentPrimary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+
+        TextInput({ placeholder: "类型 (如: 学习, 工作)", text: this.todoType })
+          .onChange(val => {
+            this.todoType = val;
+          })
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'D0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '50' 
+          })
+          .fontColor(this.currentTheme.textColor)
+          .placeholderColor(this.currentTheme.textColor + '80')
+          .padding(16)
+          .backdropBlur(8)
+          .shadow({
+            radius: 6,
+            color: this.currentTheme.glassmorphism.accentPrimary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+
+        TextInput({ placeholder: "时长 (分钟)", text: this.todoDuration.toString() })
+          .type(InputType.Number)
+          .onChange(val => {
+            this.todoDuration = Number(val) || 25;
+          })
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'D0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '50' 
+          })
+          .fontColor(this.currentTheme.textColor)
+          .placeholderColor(this.currentTheme.textColor + '80')
+          .padding(16)
+          .backdropBlur(8)
+          .shadow({
+            radius: 6,
+            color: this.currentTheme.glassmorphism.accentPrimary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+      }
+      .margin({ bottom: 24 })
+
+      // 按钮区域
+      Row({ space: 12 }) {
+        Button("取消")
+          .onClick(() => this.controller?.close())
+          .layoutWeight(1)
+          .height(48)
+          .backgroundColor(this.currentTheme.glassmorphism.surfaceLight + 'B0')
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentSecondary + '60' 
+          })
+          .fontColor(this.currentTheme.glassmorphism.accentSecondary)
+          .backdropBlur(8)
+          .shadow({
+            radius: 8,
+            color: this.currentTheme.glassmorphism.accentSecondary + '20',
+            offsetX: 0,
+            offsetY: 2
+          })
+
+        Button("确定")
+          .onClick(() => {
+            this.onConfirm(this.todoName, this.todoType, this.todoDuration);
+            this.controller?.close();
+          })
+          .layoutWeight(1)
+          .height(48)
+          .linearGradient({
+            angle: 135,
+            colors: [
+              [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+              [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+            ]
+          })
+          .borderRadius(16)
+          .border({ 
+            width: 0.5, 
+            color: this.currentTheme.glassmorphism.accentPrimary + '60' 
+          })
+          .fontColor('#FFFFFF')
+          .backdropBlur(8)
+          .shadow({
+            radius: 12,
+            color: this.currentTheme.glassmorphism.accentPrimary + '50',
+            offsetX: 0,
+            offsetY: 3
+          })
+          .blur(0.2)
+      }
+      .width('100%')
     }
-    .padding(20).width("80%").backgroundColor(Color.White).borderRadius(15)
+    .padding(24)
+    .width(320)
+    .backgroundColor(this.currentTheme.backgroundColor + 'F8') // 降低透明度，提高可读性
+    .borderRadius(24)
+    .backdropBlur(15) // 适度减少背景模糊
+    .border({ 
+      width: 0.5, 
+      color: this.currentTheme.glassmorphism.accentPrimary + '40' // 稍微增加边框可见度
+    })
+    .shadow({
+      radius: 25,
+      color: this.currentTheme.glassmorphism.accentPrimary + '30',
+      offsetX: 0,
+      offsetY: 10
+    })
+    .linearGradient({
+      angle: 135,
+      colors: [
+        [this.currentTheme.backgroundColor + 'F5', 0.0],
+        [this.currentTheme.glassmorphism.surfaceLight + 'F8', 1.0]
+      ]
+    })
   }
 }
 
@@ -242,22 +347,16 @@ struct Index {
   @State isLoggedIn: boolean = false;
   @State username: string = '';
   @State password: string = '';
-  @State currentTheme: ThemeConfig = {
-    id: 'light',
-    name: '浅色主题',
-    primaryColor: '#007AFF',
-    backgroundColor: '#FFFFFF',
-    textColor: '#000000',
-    cardBackgroundColor: '#F8F8F8',
-    borderColor: '#E0E0E0',
-    shadowColor: 'rgba(0, 0, 0, 0.1)',
-    errorColor: '#FF3B30'
-  };
+  @State currentTheme: ThemeConfig = DEFAULT_THEME_CONFIG;
   private apiService: ApiService = ApiService.getInstance();
   private themeService: ThemeService = ThemeService.getInstance();
-  private themeChangeListener = (theme: ThemeConfig) => {
-    this.currentTheme = theme;
-    console.info('Index页面主题已更新:', theme.name);
+  private themeChangeListener = async () => {
+    try {
+      this.currentTheme = await this.themeService.getCurrentTheme();
+      console.info('Index页面主题已更新:', this.currentTheme.name);
+    } catch (error) {
+      console.error('Index主题更新失败:', error);
+    }
   };
   // 使用后端API的待办事项
   @State simpleTodos: TodoItem[] = [];
@@ -279,19 +378,7 @@ struct Index {
   // private addCollectionDialog: CustomDialogController = ... ;
 
   // Dialog controller for adding simple todos
-  private addSimpleTodoDialogController: CustomDialogController = new CustomDialogController({
-    builder: AddSimpleTodoDialog({
-      todoName: $newSimpleTodoName,
-      todoType: $newSimpleTodoType,
-      todoDuration: $newSimpleTodoDuration,
-      onConfirm: () => {
-        this.addNewSimpleTodo();
-      }
-    }),
-    autoCancel: true,
-    alignment: DialogAlignment.Center,
-    customStyle: false // 根据需要设置
-  });
+  private addSimpleTodoDialogController: CustomDialogController | null = null;
 
   async aboutToAppear() {
     this.checkLoginStatus();
@@ -299,8 +386,10 @@ struct Index {
     this.themeService.addThemeChangeListener(this.themeChangeListener);
     // 加载当前主题
     try {
+      // 首先加载保存的主题偏好设置
+      await this.themeService.loadThemePreference();
       this.currentTheme = await this.themeService.getCurrentTheme();
-      console.info('Index页面加载主题:', this.currentTheme.name);
+      console.info('Index页面加载主题成功:', this.currentTheme.name);
     } catch (error) {
       console.error('Index页面加载主题失败:', error);
     }
@@ -401,6 +490,90 @@ struct Index {
     this.loadTodos();
   }
 
+  // 显示添加简单待办对话框
+  async showAddSimpleTodoDialog(): Promise<void> {
+    try {
+      // 重置输入状态
+      this.newSimpleTodoName = '';
+      this.newSimpleTodoType = '';
+      this.newSimpleTodoDuration = 25;
+      
+      // 预先获取当前主题，确保弹窗显示时主题已加载
+      const currentTheme = await this.themeService.getCurrentTheme();
+      console.info('准备打开添加简单待办弹窗，当前主题:', currentTheme.name);
+      
+      // 每次打开时重新创建，确保获取最新主题
+      this.addSimpleTodoDialogController = new CustomDialogController({
+        builder: AddSimpleTodoDialog({
+          todoName: this.newSimpleTodoName,
+          todoType: this.newSimpleTodoType,
+          todoDuration: this.newSimpleTodoDuration,
+          currentTheme: currentTheme, // 传递当前主题
+          onConfirm: (name: string, type: string, duration: number) => {
+            this.addNewSimpleTodoFromDialog(name, type, duration);
+          }
+        }),
+        autoCancel: true,
+        alignment: DialogAlignment.Center,
+        customStyle: true, // 使用自定义样式
+        maskColor: Color.Transparent // 去掉默认的遮罩颜色
+      });
+      this.addSimpleTodoDialogController.open();
+    } catch (error) {
+      console.error('打开添加简单待办弹窗失败:', error);
+    }
+  }
+
+  async addNewSimpleTodoFromDialog(name: string, type: string, duration: number) {
+    if (name.trim() === '') {
+      promptAction.showToast({ message: '请输入待办名称' });
+      return;
+    }
+    if (type.trim() === '') {
+      promptAction.showToast({ message: '请输入待办类型' });
+      return;
+    }
+    if (duration <= 0) {
+      promptAction.showToast({ message: '请输入有效的时长' });
+      return;
+    }
+
+    try {
+      const todoData: TodoItemRequest = {
+        title: name.trim(),
+        description: type.trim(),
+        type: type.trim() || 'general',
+        duration: duration,
+        isImportant: false,
+        isUrgent: false
+      };
+
+      const newTodo: ApiTodoItem = await this.apiService.createTodoItem(todoData);
+
+      // 转换为本地TodoItem格式
+      const localTodo = new TodoItem(
+        newTodo.id,
+        newTodo.title,
+        newTodo.type || 'general',
+        newTodo.duration || 25,
+        newTodo.completed
+      );
+
+      this.simpleTodos.push(localTodo);
+
+      // 重置输入框状态
+      this.newSimpleTodoName = '';
+      this.newSimpleTodoType = '';
+      this.newSimpleTodoDuration = 25;
+
+      promptAction.showToast({ message: "新待办已添加" });
+    } catch (error) {
+      console.error('添加待办失败:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      promptAction.showToast({ message: '添加待办失败：' + errorMessage });
+    }
+  }
+
   async addNewSimpleTodo() {
     if (this.newSimpleTodoName.trim() === '') {
       promptAction.showToast({ message: '请输入待办名称' });
@@ -446,7 +619,8 @@ struct Index {
       promptAction.showToast({ message: "新待办已添加" });
     } catch (error) {
       console.error('添加待办失败:', error);
-      promptAction.showToast({ message: '添加待办失败：' + (error as Error).message });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      promptAction.showToast({ message: '添加待办失败：' + errorMessage });
     }
   }
 
@@ -461,7 +635,7 @@ struct Index {
       const todos: ApiTodoItem[] = await this.apiService.getTodoItems();
 
       // 转换为本地TodoItem格式
-      this.simpleTodos = todos.map((todo: ApiTodoItem) => new TodoItem(
+      this.simpleTodos = todos.map((todo: ApiTodoItem): TodoItem => new TodoItem(
         todo.id,
         todo.title,
         todo.type || 'general',
@@ -512,7 +686,20 @@ struct Index {
     }
   }
 
-  // // startSequenceTask (移除)
+  // 为待办开始专注的方法
+  private startFocusForTodo(todo: TodoItem): void {
+    const params: FocusTimerRouterParams = {
+      title: todo.title,
+      taskTitle: todo.title,
+      time: todo.duration * 60,
+      todoId: todo.id,
+      isSequence: false
+    };
+    router.pushUrl({ url: 'pages/FocusTimer', params: params })
+      .catch((err: Error) => {
+        console.error(`跳转FocusTimer出错: ${err.message}`);
+      });
+  }
 
   handlePermissionSettings() {
     const context = this.getAppAbilityContext();
@@ -536,7 +723,8 @@ struct Index {
           return uiContext;
         }
       } catch (e) {
-        console.error("Context conversion to UIAbilityContext error: " + ((e as Error).message || String(e)));
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        console.error("Context conversion to UIAbilityContext error: " + errorMessage);
       }
     }
     console.warn("Failed to get a valid UIAbilityContext.");
@@ -676,217 +864,503 @@ struct Index {
     .backgroundColor('transparent')
   }
 
+  @Builder
+  AddSimpleTodoDialog() {
+    Column({ space: 20 }) {
+      Text('添加新待办')
+        .fontSize(20)
+        .fontColor(this.currentTheme.glassmorphism.accentPrimary)
+        .fontWeight(FontWeight.Bold)
+        .textShadow({
+          radius: 8,
+          color: this.currentTheme.glassmorphism.accentPrimary + '50',
+          offsetX: 0,
+          offsetY: 0
+        })
+
+      // ... existing dialog content ...
+    }
+    .width('100%')
+    .backgroundColor(this.currentTheme.glassmorphism.surfaceStrong)
+    .borderRadius(20)
+    .border({ width: 1, color: this.currentTheme.glassmorphism.borderMedium })
+    .padding(24)
+    .shadow({
+      radius: 24,
+      color: this.currentTheme.glassmorphism.shadowDeep,
+      offsetX: 0,
+      offsetY: 12
+    })
+  }
+
   build() {
-    Column() {
-      if (!this.isLoggedIn) {
-        // 登录表单
+    if (!this.isLoggedIn) {
+      // 登录界面 - 使用主题感知的渐变背景
+      ThemeAwareGradientBackground({ gradientType: 'primary' }) {
         Column() {
-          Text('鸿蒙每日打卡')
-            .fontSize(28)
-            .fontWeight(FontWeight.Bold)
-            .margin({ top: 50, bottom: 30 })
+          // 标题区域
+          Column() {
+            Text('✨')
+              .fontSize(64)
+              .margin({ bottom: 16 })
+            
+            Text('Daily Focus')
+              .fontSize(32)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.currentTheme.textColor)
+              .textShadow({
+                radius: 12,
+                color: this.currentTheme.glassmorphism.accentPrimary + '60',
+                offsetX: 0,
+                offsetY: 0
+              })
+              .margin({ bottom: 8 })
+            
+            Text('专注每一天，成就更好的自己')
+              .fontSize(16)
+              .fontColor(this.currentTheme.textColor)
+              .opacity(0.8)
+              .margin({ bottom: 48 })
+          }
 
-          TextInput({ placeholder: '用户名', text: this.username })
-            .width('80%')
-            .height(50)
-            .margin({ bottom: 20 })
-            .onChange((value: string) => {
-              this.username = value;
-            })
+          // 登录卡片 - 使用主题感知的玻璃卡片
+          ThemeAwareGlassCard({ level: 'strong' }) {
+            Column({ space: 20 }) {
+              // 登录标题
+              Text('欢迎回来')
+                .fontSize(24)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.currentTheme.textColor)
+                .textAlign(TextAlign.Center)
 
-          TextInput({ placeholder: '密码', text: this.password })
-            .width('80%')
-            .height(50)
-            .margin({ bottom: 30 })
-            .type(InputType.Password)
-            .onChange((value: string) => {
-              this.password = value;
-            })
+              // 用户名输入
+              TextInput({ placeholder: '用户名', text: this.username })
+                .type(InputType.Normal)
+                .backgroundColor(this.currentTheme.glassmorphism.surfaceLight)
+                .borderRadius(12)
+                .border({ width: 1, color: this.currentTheme.glassmorphism.borderLight })
+                .fontColor(this.currentTheme.textColor)
+                .placeholderColor(this.currentTheme.textColor + '60')
+                .onChange((value: string) => {
+                  this.username = value;
+                })
 
-          Button('登录')
-            .width('80%')
-            .height(50)
-            .backgroundColor('#8A2BE2')
-            .onClick(() => {
-              this.handleLogin();
-            })
+              // 密码输入
+              TextInput({ placeholder: '密码', text: this.password })
+                .type(InputType.Password)
+                .backgroundColor(this.currentTheme.glassmorphism.surfaceLight)
+                .borderRadius(12)
+                .border({ width: 1, color: this.currentTheme.glassmorphism.borderLight })
+                .fontColor(this.currentTheme.textColor)
+                .placeholderColor(this.currentTheme.textColor + '60')
+                .onChange((value: string) => {
+                  this.password = value;
+                })
 
-          Button('注册')
-            .width('80%')
-            .height(50)
-            .margin({ top: 20 })
-            .backgroundColor('#F5F5F5')
-            .fontColor('#8A2BE2')
-            .onClick(() => {
-              this.handleRegister();
-            })
+              // 登录按钮
+              Button('🚀 登录')
+                .width('100%')
+                .height(50)
+                .backgroundColor(this.currentTheme.glassmorphism.accentPrimary + '30')
+                .borderRadius(25)
+                .border({ width: 1, color: this.currentTheme.glassmorphism.accentPrimary })
+                .fontColor(this.currentTheme.glassmorphism.accentPrimary)
+                .fontSize(16)
+                .fontWeight(FontWeight.Bold)
+                .shadow({
+                  radius: 20,
+                  color: this.currentTheme.glassmorphism.accentPrimary + '40',
+                  offsetX: 0,
+                  offsetY: 0
+                })
+                .onClick(() => {
+                  this.handleLogin();
+                })
+
+              // 注册按钮
+              Button('✨ 注册')
+                .width('100%')
+                .height(50)
+                .backgroundColor(this.currentTheme.glassmorphism.surfaceLight)
+                .borderRadius(25)
+                .border({ width: 1, color: this.currentTheme.glassmorphism.borderLight })
+                .fontColor(this.currentTheme.textColor)
+                .fontSize(16)
+                .shadow({
+                  radius: 8,
+                  color: this.currentTheme.glassmorphism.shadowSoft,
+                  offsetX: 0,
+                  offsetY: 4
+                })
+                .onClick(() => {
+                  this.handleRegister();
+                })
+            }
+          }
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#FFFFFF')
-      } else {
-        // 主界面内容
-        Stack() {
-          Column() {
-            // 顶部标题栏
-            Row() {
-              Text('待办列表')
-                .fontSize(22).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
-              Blank()
-              Row({ space: 16 }) {
-                Row() {
-                  Text('必开').fontSize(14).fontColor('#FFFFFF')
-                  Text('权限').fontSize(14).fontColor('#FFFFFF')
-                }
-                .backgroundColor('rgba(255, 255, 255, 0.2)')
-                .borderRadius(12)
-                .padding({
-                  left: 8,
-                  right: 8,
-                  top: 4,
-                  bottom: 4
-                })
-                .margin({ right: 4 })
-                .onClick(() => {
-                  this.handlePermissionSettings();
-                })
-
-                Text('✓').fontSize(24).fontColor('#FFFFFF')
-                  .onClick(() => {
-                    promptAction.showToast({ message: "打卡菜单待实现" });
-                  })
-                Text('+').fontSize(24).fontColor('#FFFFFF')
-                  .onClick(() => {
-                    this.newSimpleTodoName = '';
-                    this.newSimpleTodoType = '';
-                    this.newSimpleTodoDuration = 25;
-                    this.addSimpleTodoDialogController.open();
-                  })
-                Text('≡').fontSize(24).fontColor('#FFFFFF')
-                  .onClick(() => {
-                    promptAction.showToast({ message: "更多菜单待实现" });
-                  })
+        .justifyContent(FlexAlign.Center)
+        .padding(24)
+      }
+    } else {
+      // 主界面内容 - 应用渐变背景
+      ThemeAwareGradientBackground({ gradientType: 'primary' }) {
+        Column() {
+          // 顶部毛玻璃导航栏
+          Row() {
+            Text('✨ 待办列表')
+              .fontSize(20)
+              .fontColor(this.currentTheme.textColor)
+              .fontWeight(FontWeight.Bold)
+              .textShadow({
+                radius: 8,
+                color: this.currentTheme.glassmorphism.accentPrimary + '50',
+                offsetX: 0,
+                offsetY: 0
+              })
+            
+            Blank()
+            
+            Row({ space: 12 }) {
+              // 权限设置按钮
+              Row() {
+                Text('🛡️')
+                  .fontSize(16)
+                  .margin({ right: 4 })
+                Text('权限')
+                  .fontSize(12)
+                  .fontColor(this.currentTheme.textColor)
               }
-            }
-            .width('100%')
-            .height(50)
-            .padding({ left: 16, right: 16 })
-            .backgroundColor(this.currentTheme.primaryColor)
+              .backgroundColor(this.currentTheme.glassmorphism.surfaceLight)
+              .borderRadius(16)
+              .border({ width: 1, color: this.currentTheme.glassmorphism.borderLight })
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .shadow({
+                radius: 8,
+                color: this.currentTheme.glassmorphism.shadowSoft,
+                offsetX: 0,
+                offsetY: 4
+              })
+              .onClick(() => {
+                this.handlePermissionSettings();
+              })
 
-            // 内容区域
-            Scroll() {
-              Column({ space: 10 }) {
-                if (this.isLoadingTodos) {
-                  Row() {
+              // 打卡按钮
+              Text('✓')
+                .fontSize(20)
+                .fontColor(this.currentTheme.glassmorphism.accentSecondary)
+                .textShadow({
+                  radius: 8,
+                  color: this.currentTheme.glassmorphism.accentSecondary,
+                  offsetX: 0,
+                  offsetY: 0
+                })
+                .backgroundColor(this.currentTheme.glassmorphism.surfaceLight)
+                .borderRadius(20)
+                .border({ width: 1, color: this.currentTheme.glassmorphism.borderLight })
+                .width(40)
+                .height(40)
+                .textAlign(TextAlign.Center)
+                .onClick(() => {
+                  promptAction.showToast({ message: "打卡菜单待实现" });
+                })
+
+              // 添加按钮
+              Text('+')
+                .fontSize(24)
+                .fontColor(this.currentTheme.glassmorphism.accentTertiary)
+                .textShadow({
+                  radius: 12,
+                  color: this.currentTheme.glassmorphism.accentTertiary,
+                  offsetX: 0,
+                  offsetY: 0
+                })
+                .backgroundColor(this.currentTheme.glassmorphism.surfaceMedium)
+                .borderRadius(20)
+                .border({ width: 1, color: this.currentTheme.glassmorphism.accentTertiary })
+                .width(40)
+                .height(40)
+                .textAlign(TextAlign.Center)
+                .onClick(() => {
+                  this.showAddSimpleTodoDialog();
+                })
+
+              // 菜单按钮
+              Text('≡')
+                .fontSize(20)
+                .fontColor(this.currentTheme.glassmorphism.accentPrimary)
+                .textShadow({
+                  radius: 8,
+                  color: this.currentTheme.glassmorphism.accentPrimary,
+                  offsetX: 0,
+                  offsetY: 0
+                })
+                .backgroundColor(this.currentTheme.glassmorphism.surfaceLight)
+                .borderRadius(20)
+                .border({ width: 1, color: this.currentTheme.glassmorphism.borderLight })
+                .width(40)
+                .height(40)
+                .textAlign(TextAlign.Center)
+                .onClick(() => {
+                  router.pushUrl({ url: 'pages/ThemeSettingsPage' });
+                })
+            }
+          }
+          .width('100%')
+          .height(60)
+          .padding({ left: 20, right: 20 })
+          .backgroundColor(this.currentTheme.glassmorphism.blurOverlay)
+          .border({ width: { bottom: 1 }, color: this.currentTheme.glassmorphism.borderLight })
+
+          // 内容区域
+          Scroll() {
+            Column({ space: 16 }) {
+              if (this.isLoadingTodos) {
+                // 加载状态的玻璃卡片
+                ThemeAwareGlassCard({ level: 'medium' }) {
+                  Column() {
                     LoadingProgress()
-                      .width(30)
-                      .height(30)
-                      .margin({ right: 10 })
+                      .width(40)
+                      .height(40)
+                      .color(this.currentTheme.glassmorphism.accentPrimary)
+                      .margin({ bottom: 12 })
                     Text('加载中...')
                       .fontSize(16)
-                      .fontColor(this.currentTheme.textColor)
+                      .fontColor(this.currentTheme.glassmorphism.accentPrimary)
+                      .textShadow({
+                        radius: 8,
+                        color: this.currentTheme.glassmorphism.accentPrimary + '50',
+                        offsetX: 0,
+                        offsetY: 0
+                      })
                   }
                   .width('100%')
                   .justifyContent(FlexAlign.Center)
-                  .padding(20)
-                } else if (this.simpleTodos.length === 0) {
+                  .alignItems(HorizontalAlign.Center)
+                  .padding(32)
+                }
+              } else if (this.simpleTodos.length === 0) {
+                // 空状态的玻璃卡片
+                ThemeAwareGlassCard({ level: 'medium' }) {
                   Column() {
+                    Text('🌟')
+                      .fontSize(48)
+                      .margin({ bottom: 16 })
                     Text('暂无待办事项')
-                      .fontSize(16)
-                      .fontColor(this.currentTheme.textColor)
-                      .opacity(0.6)
+                      .fontSize(18)
+                      .fontColor(this.currentTheme.glassmorphism.accentSecondary)
+                      .fontWeight(FontWeight.Bold)
+                      .textShadow({
+                        radius: 8,
+                        color: this.currentTheme.glassmorphism.accentSecondary + '50',
+                        offsetX: 0,
+                        offsetY: 0
+                      })
                     Text('点击右上角 + 号添加新的待办')
                       .fontSize(14)
                       .fontColor(this.currentTheme.textColor)
-                      .opacity(0.4)
+                      .opacity(0.7)
                       .margin({ top: 8 })
                   }
                   .width('100%')
                   .justifyContent(FlexAlign.Center)
+                  .alignItems(HorizontalAlign.Center)
                   .padding(40)
-                } else {
-                  List({ space: 10 }) {
-                  ForEach(this.simpleTodos, (todo: TodoItem) => {
-                      ListItem() {
+                }
+              } else {
+                // 待办列表
+                ForEach(this.simpleTodos, (todo: TodoItem) => {
+                  ThemeAwareGlassCard({ level: 'light' }) {
                     Row() {
+                      // 完成状态指示器
+                      Circle({ width: 12, height: 12 })
+                        .fill(todo.isCompleted ? 
+                          this.currentTheme.glassmorphism.accentSecondary : 
+                          this.currentTheme.glassmorphism.accentPrimary)
+                        .shadow(todo.isCompleted ? undefined : {
+                          radius: 8,
+                          color: this.currentTheme.glassmorphism.accentPrimary + '60',
+                          offsetX: 0,
+                          offsetY: 0
+                        })
+                        .margin({ right: 12 })
+
+                      // 待办内容
                       Column() {
-                        Text(todo.title)
-                          .fontSize(18)
-                          .fontWeight(FontWeight.Bold)
-                          .fontColor(this.currentTheme.textColor)
-                          .decoration({
-                            type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
+                        // 使用Stack实现渐变文字效果
+                        Stack() {
+                          Text(todo.title)
+                            .fontSize(16)
+                            .fontWeight(FontWeight.Medium)
+                            .decoration({
+                              type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
+                            })
+                            .opacity(todo.isCompleted ? 0.6 : 1.0)
+                            .linearGradient(todo.isCompleted ? undefined : {
+                              angle: 45,
+                              colors: [
+                                [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+                                [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+                              ]
+                            })
+                            .blur(todo.isCompleted ? 0 : 0.3) // 轻微哑光效果
+                            .textShadow({
+                              radius: todo.isCompleted ? 2 : 6,
+                              color: todo.isCompleted ? 
+                                this.currentTheme.glassmorphism.shadowSoft : 
+                                this.currentTheme.glassmorphism.accentPrimary + '50',
+                              offsetX: 0,
+                              offsetY: todo.isCompleted ? 1 : 2
+                            })
+                        }
+
+                        if (todo.type) {
+                          // 升级描述标签的渐变和哑光效果
+                          Stack() {
+                            Text(todo.type)
+                              .fontSize(12)
+                              .fontColor('#FFFFFF')
+                              .fontWeight(FontWeight.Medium)
+                              .textShadow({
+                                radius: 4,
+                                color: '#00000040',
+                                offsetX: 0,
+                                offsetY: 1
+                              })
+                          }
+                          .linearGradient({
+                            angle: 135,
+                            colors: [
+                              [this.currentTheme.glassmorphism.accentSecondary, 0.0],
+                              [this.currentTheme.glassmorphism.accentTertiary, 1.0]
+                            ]
                           })
-                          .opacity(todo.isCompleted ? 0.6 : 1.0)
-                              .textAlign(TextAlign.Start)
-                        Text(`${todo.type} - ${todo.formatDuration()}`)
-                          .fontSize(14)
-                          .fontColor(this.currentTheme.textColor)
-                          .opacity(todo.isCompleted ? 0.4 : 0.7)
-                          .decoration({
-                            type: todo.isCompleted ? TextDecorationType.LineThrough : TextDecorationType.None
+                          .borderRadius(12)
+                          .border({ 
+                            width: 1, 
+                            color: this.currentTheme.glassmorphism.accentSecondary + '60' 
                           })
+                          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+                          .shadow({
+                            radius: 8,
+                            color: this.currentTheme.glassmorphism.accentSecondary + '40',
+                            offsetX: 0,
+                            offsetY: 2
+                          })
+                          .blur(0.4) // 哑光效果
+                          .margin({ top: 6 })
+                        }
+
+                        // 添加时长显示（如果存在）
+                        if (todo.duration && todo.duration > 0) {
+                          Stack() {
+                            Text(`${todo.duration}分钟`)
+                              .fontSize(11)
+                              .fontColor('#FFFFFF')
+                              .fontWeight(FontWeight.Medium)
+                              .textShadow({
+                                radius: 3,
+                                color: '#00000030',
+                                offsetX: 0,
+                                offsetY: 1
+                              })
+                          }
+                          .linearGradient({
+                            angle: 45,
+                            colors: [
+                              [this.currentTheme.glassmorphism.accentTertiary, 0.0],
+                              [this.currentTheme.glassmorphism.accentPrimary, 1.0]
+                            ]
+                          })
+                          .borderRadius(10)
+                          .border({ 
+                            width: 1, 
+                            color: this.currentTheme.glassmorphism.accentTertiary + '50' 
+                          })
+                          .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+                          .shadow({
+                            radius: 6,
+                            color: this.currentTheme.glassmorphism.accentTertiary + '30',
+                            offsetX: 0,
+                            offsetY: 1
+                          })
+                          .blur(0.3) // 轻微哑光效果
                           .margin({ top: 4 })
-                              .textAlign(TextAlign.Start)
+                        }
                       }
                       .layoutWeight(1)
                       .alignItems(HorizontalAlign.Start)
 
-                          // 只保留专注按钮
-                        if (!todo.isCompleted) {
-                          Button('专注')
-                            .fontSize(12)
-                            .fontColor(Color.White)
-                            .backgroundColor(this.currentTheme.primaryColor)
-                            .borderRadius(8)
-                            .height(28)
-                            .padding({ left: 8, right: 8 })
-                            .onClick(() => {
-                              const params: FocusTimerRouterParams = {
-                                title: todo.title,
-                                taskTitle: todo.title,
-                                time: todo.duration * 60,
-                                todoId: todo.id,
-                                isSequence: false
-                              };
-                              router.pushUrl({ url: 'pages/FocusTimer', params: params })
-                                .catch((err: Error) => {
-                                  console.error(`跳转FocusTimer出错: ${err.message}`);
-                                });
-                            })
-                        }
+                      // 专注按钮 - 升级为二色渐变哑光效果
+                      Stack() {
+                        Text('专注')
+                          .fontSize(12)
+                          .fontColor('#FFFFFF')
+                          .fontWeight(FontWeight.Medium)
+                          .textAlign(TextAlign.Center)
+                          .width('100%')
+                          .height('100%')
+                          .textShadow({
+                            radius: 4,
+                            color: '#00000050',
+                            offsetX: 0,
+                            offsetY: 1
+                          })
+                      }
+                      .width(80)
+                      .height(36)
+                      .padding({ left: 16, right: 16 })
+                      .linearGradient({
+                        angle: 135,
+                        colors: [
+                          [this.currentTheme.glassmorphism.accentPrimary, 0.0],
+                          [this.currentTheme.glassmorphism.accentSecondary, 1.0]
+                        ]
+                      })
+                      .borderRadius(16)
+                      .border({ 
+                        width: 1, 
+                        color: this.currentTheme.glassmorphism.accentPrimary + '60' 
+                      })
+                      .shadow({
+                        radius: 12,
+                        color: this.currentTheme.glassmorphism.accentPrimary + '40',
+                        offsetX: 0,
+                        offsetY: 3
+                      })
+                      .blur(0.6) // 增强哑光效果
+                      .animation({
+                        duration: 200,
+                        curve: Curve.EaseInOut
+                      })
+                      .onClick(() => {
+                        this.startFocusForTodo(todo);
+                      })
                     }
                     .width('100%')
-                    .backgroundColor(this.currentTheme.cardBackgroundColor)
-                    .borderRadius(8)
-                    .padding(12)
-                    .opacity(todo.isCompleted ? 0.7 : 1.0)
-                      }
-                      .swipeAction({
-                        end: {
-                          builder: () => {
-                            this.deleteSimpleTodoBuilder(todo)
-                          }
-                        }
-                      })
-                  }, (todo: TodoItem) => todo.id.toString())
+                    .padding(16)
+                    .onClick(() => {
+                      this.toggleTodoStatus(todo.id);
+                    })
                   }
-                  .width('100%')
-                  .divider({ strokeWidth: 0 }) // 移除分割线
-                }
+                }, (todo: TodoItem) => todo.id.toString())
               }
-              .width('100%')
-              .padding(16)
             }
-            .layoutWeight(1)
+            .width('100%')
+            .padding(20)
+          }
+          .layoutWeight(1)
 
-            // 底部导航栏
+          // 底部毛玻璃导航栏
+          Column() {
             TabBar({ currentIndex: 0 })
           }
-          .width('100%')
-          .height('100%')
-          .backgroundColor(this.currentTheme.backgroundColor)
+          .backgroundColor(this.currentTheme.glassmorphism.blurOverlay)
+          .border({ width: { top: 1 }, color: this.currentTheme.glassmorphism.borderLight })
         }
+        .width('100%')
+        .height('100%')
       }
     }
   }
